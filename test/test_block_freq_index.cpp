@@ -64,4 +64,6 @@ BOOST_AUTO_TEST_CASE(block_freq_index)
     test_block_freq_index<quasi_succinct::optpfor_block>();
     test_block_freq_index<quasi_succinct::varint_G8IU_block>();
     test_block_freq_index<quasi_succinct::interpolative_block>();
+    test_block_freq_index<quasi_succinct::u32_block>();
+    test_block_freq_index<quasi_succinct::vbyte_block>();
 }

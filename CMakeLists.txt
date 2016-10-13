@@ -54,6 +54,7 @@ target_link_libraries(create_freq_index
   ${Boost_LIBRARIES}
   FastPFor_lib
   block_codecs
+  pthread
   )
 
 add_executable(create_wand_data create_wand_data.cpp)

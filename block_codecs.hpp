@@ -303,4 +303,51 @@ namespace quasi_succinct {
             }
         }
     };
+    
+    struct u32_block {
+        static const uint64_t block_size = 128;
+
+        static void encode(uint32_t const* in, uint32_t /* sum_of_values */,
+                           size_t n, std::vector<uint8_t>& out)
+        {
+            assert(n <= block_size);
+            size_t srclen = n * sizeof(uint32_t);
+            const uint8_t* src = (const uint8_t*) in;
+            out.insert(out.end(), src, src + srclen);
+        }
+
+        static uint8_t const* decode(uint8_t const* in, uint32_t* out,
+                                     uint32_t /* sum_of_values */, size_t n)
+        {
+            assert(n <= block_size);
+            const uint8_t* src = (const uint8_t*) in;
+            uint8_t* dst = (uint8_t*) out;
+            size_t n4 = n*4;
+            for(size_t i=0;i<n4;i++) {
+                *dst++ = *src++;
+            }
+            return src;
+        }
+    };
+
+    struct vbyte_block {
+        static const uint64_t block_size = 128;
+
+        static void encode(uint32_t const* in, uint32_t /* sum_of_values */,
+                           size_t n, std::vector<uint8_t>& out)
+        {
+            std::vector<uint8_t> buf(2 * 4 * block_size);
+            size_t out_len = buf.size();
+            TightVariableByte::encode(in, n, buf.data(), out_len);
+            out.insert(out.end(), buf.data(), buf.data() + out_len);
+        }
+
+        static uint8_t const* decode(uint8_t const* in, uint32_t* out,
+                                     uint32_t /* sum_of_values */, size_t n)
+        {
+            return TightVariableByte::decode(in,out,n);
+        }
+    };
+
+
 }
