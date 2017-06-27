@@ -39,6 +39,8 @@ namespace quasi_succinct {
     typedef block_freq_index<quasi_succinct::u32_block> block_u32_index;
     
     typedef block_freq_index<quasi_succinct::vbyte_block> block_vbyte_index;
+
+    typedef block_freq_index<quasi_succinct::simple16_block> block_simple16_index;
 }
 
-#define QS_INDEX_TYPES (ef)(single)(uniform)(opt)(block_optpfor)(block_varint)(block_interpolative)(block_u32)(block_vbyte)
+#define QS_INDEX_TYPES (ef)(single)(uniform)(opt)(block_optpfor)(block_varint)(block_interpolative)(block_u32)(block_vbyte)(block_simple16)

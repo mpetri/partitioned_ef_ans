@@ -38,4 +38,7 @@ BOOST_AUTO_TEST_CASE(block_codecs)
     test_block_codec<quasi_succinct::optpfor_block>();
     test_block_codec<quasi_succinct::varint_G8IU_block>();
     test_block_codec<quasi_succinct::interpolative_block>();
+    test_block_codec<quasi_succinct::u32_block>();
+    test_block_codec<quasi_succinct::vbyte_block>();
+    test_block_codec<quasi_succinct::simple16_block>();
 }

@@ -6,4 +6,5 @@ namespace quasi_succinct {
 
     VarIntG8IU varint_G8IU_block::varint_codec;
     TightVariableByte varint_G8IU_block::vbyte_codec;
+    simple16_block::codec_type simple16_block::simple16_codec;
 }
