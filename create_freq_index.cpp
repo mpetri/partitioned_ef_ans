@@ -89,6 +89,20 @@ void get_size_stats(quasi_succinct::block_freq_index<BlockCodec>& coll,
     docs_size = total_size - freqs_size;
 }
 
+template <typename t_ans_model>
+void get_size_stats(quasi_succinct::ans_block_freq_index<t_ans_model>& coll,
+                    uint64_t& docs_size, uint64_t& freqs_size)
+{
+    auto size_tree = succinct::mapper::size_tree_of(coll);
+    size_tree->dump();
+    uint64_t total_size = size_tree->size;
+    freqs_size = 0;
+    for (size_t i = 0; i < coll.size(); ++i) {
+        freqs_size += coll[i].stats_freqs_size();
+    }
+    docs_size = total_size - freqs_size;
+}
+
 template <typename Collection>
 void dump_stats(Collection& coll,
                 std::string const& type,
@@ -196,6 +210,22 @@ void create_collection(InputCollection const& input,
     double user_tick = get_user_time_usecs();
 
     typename CollectionType::builder builder(input.num_docs(), params);
+
+
+    {
+        progress_logger mplog;
+        for (auto const& plist: input) {
+            uint64_t freqs_sum = std::accumulate(plist.freqs.begin(),
+                                                 plist.freqs.end(), uint64_t(0));
+
+            builder.model_posting_list(plist.docs.size(), plist.docs.begin(),
+                                     plist.freqs.begin(), freqs_sum);
+            mplog.done_sequence(plist.docs.size());
+        }
+        builder.freeze_models();
+        mplog.log();
+    }
+
     progress_logger plog;
     for (auto const& plist: input) {
         uint64_t freqs_sum = std::accumulate(plist.freqs.begin(),

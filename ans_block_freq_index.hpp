@@ -4,14 +4,17 @@
 #include <succinct/bit_vector.hpp>
 
 #include "compact_elias_fano.hpp"
-#include "block_posting_list.hpp"
+#include "ans_block_posting_list.hpp"
+
+#include "ans_models.hpp"
 
 namespace quasi_succinct {
 
-    template <typename BlockCodec>
-    class block_freq_index {
+
+    template <typename t_ansmodel>
+    class ans_block_freq_index {
     public:
-        block_freq_index()
+        ans_block_freq_index()
             : m_size(0)
         {}
 
@@ -22,11 +25,15 @@ namespace quasi_succinct {
             {
                 m_num_docs = num_docs;
                 m_endpoints.push_back(0);
+                m_doc_counts = t_ansmodel::create_empty_counts();
+                m_freq_counts = t_ansmodel::create_empty_counts();
             }
 
             template <typename DocsIterator, typename FreqsIterator>
-            void model_posting_list(uint64_t , DocsIterator , FreqsIterator , uint64_t )
+            void model_posting_list(uint64_t n, DocsIterator docs_begin,
+                                  FreqsIterator freqs_begin, uint64_t /*occurrences*/)
             {
+                ans_block_posting_list<t_ansmodel>::model(m_doc_counts,m_freq_counts,n,docs_begin, freqs_begin);
             }
 
             template <typename DocsIterator, typename FreqsIterator>
@@ -34,21 +41,25 @@ namespace quasi_succinct {
                                   FreqsIterator freqs_begin, uint64_t /* occurrences */)
             {
                 if (!n) throw std::invalid_argument("List must be nonempty");
-                block_posting_list<BlockCodec>::write(m_lists, n,
-                                                      docs_begin, freqs_begin);
+                ans_block_posting_list<t_ansmodel>::write(m_doc_enc_model,m_freq_enc_model,m_lists, n, docs_begin, freqs_begin);
                 m_endpoints.push_back(m_lists.size());
             }
 
             void freeze_models() {
-
+            	m_doc_enc_model = t_ansmodel::create_enc_model_from_counts(m_doc_counts);
+            	m_freq_enc_model = t_ansmodel::create_enc_model_from_counts(m_freq_counts);
+            	m_doc_dec_model = t_ansmodel::create_dec_model(m_doc_enc_model);
+            	m_freq_dec_model = t_ansmodel::create_dec_model(m_freq_enc_model);
             }
 
-            void build(block_freq_index& sq)
+            void build(ans_block_freq_index& sq)
             {
                 sq.m_params = m_params;
                 sq.m_size = m_endpoints.size() - 1;
                 sq.m_num_docs = m_num_docs;
                 sq.m_lists.steal(m_lists);
+                sq.m_doc_dec_model.steal(m_doc_dec_model);
+                sq.m_freq_dec_model.steal(m_freq_dec_model);
 
                 succinct::bit_vector_builder bvb;
                 compact_elias_fano::write(bvb, m_endpoints.begin(),
@@ -62,6 +73,12 @@ namespace quasi_succinct {
             size_t m_num_docs;
             std::vector<uint64_t> m_endpoints;
             std::vector<uint8_t> m_lists;
+            std::vector<uint8_t> m_doc_counts;
+            std::vector<uint8_t> m_freq_counts;
+            std::vector<uint8_t> m_doc_enc_model;
+            std::vector<uint8_t> m_freq_enc_model;
+            std::vector<uint8_t> m_doc_dec_model;
+            std::vector<uint8_t> m_freq_dec_model;
         };
 
         size_t size() const
@@ -74,7 +91,7 @@ namespace quasi_succinct {
             return m_num_docs;
         }
 
-        typedef typename block_posting_list<BlockCodec>::document_enumerator document_enumerator;
+        typedef typename ans_block_posting_list<t_ansmodel>::document_enumerator document_enumerator;
 
         document_enumerator operator[](size_t i) const
         {
@@ -84,10 +101,10 @@ namespace quasi_succinct {
                                                      m_params);
 
             auto endpoint = endpoints.move(i).second;
-            return document_enumerator(m_lists.data() + endpoint, num_docs());
+            return document_enumerator(m_doc_dec_model.data(),m_freq_dec_model.data(),m_lists.data() + endpoint, num_docs());
         }
 
-        void swap(block_freq_index& other)
+        void swap(ans_block_freq_index& other)
         {
             std::swap(m_params, other.m_params);
             std::swap(m_size, other.m_size);
@@ -104,6 +121,8 @@ namespace quasi_succinct {
                 (m_num_docs, "m_num_docs")
                 (m_endpoints, "m_endpoints")
                 (m_lists, "m_lists")
+                (m_doc_dec_model, "m_doc_dec_model")
+                (m_freq_dec_model, "m_freq_dec_model")
                 ;
         }
 
@@ -113,5 +132,7 @@ namespace quasi_succinct {
         size_t m_num_docs;
         succinct::bit_vector m_endpoints;
         succinct::mapper::mappable_vector<uint8_t> m_lists;
+        succinct::mapper::mappable_vector<uint8_t> m_doc_dec_model;
+        succinct::mapper::mappable_vector<uint8_t> m_freq_dec_model;
     };
 }

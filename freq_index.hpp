@@ -26,6 +26,11 @@ namespace quasi_succinct {
             {}
 
             template <typename DocsIterator, typename FreqsIterator>
+            void model_posting_list(uint64_t , DocsIterator , FreqsIterator , uint64_t )
+            {
+            }
+
+            template <typename DocsIterator, typename FreqsIterator>
             void add_posting_list(uint64_t n, DocsIterator docs_begin,
                                   FreqsIterator freqs_begin, uint64_t occurrences)
             {
@@ -37,6 +42,10 @@ namespace quasi_succinct {
                         (*this, docs_begin,
                          freqs_begin, occurrences, n));
                 m_queue.add_job(ptr, 2 * n);
+            }
+
+            void freeze_models() {
+
             }
 
             void build(freq_index& sq)

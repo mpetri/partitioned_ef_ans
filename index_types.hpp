@@ -11,6 +11,8 @@
 #include "binary_freq_collection.hpp"
 #include "block_freq_index.hpp"
 #include "block_codecs.hpp"
+#include "ans_block_freq_index.hpp"
+#include "ans_models.hpp"
 
 namespace quasi_succinct {
 
@@ -41,6 +43,8 @@ namespace quasi_succinct {
     typedef block_freq_index<quasi_succinct::vbyte_block> block_vbyte_index;
 
     typedef block_freq_index<quasi_succinct::simple16_block> block_simple16_index;
+
+    typedef ans_block_freq_index<quasi_succinct::ans_vbyte_model<4096>> block_ansvbyte_index;
 }
 
-#define QS_INDEX_TYPES (ef)(single)(uniform)(opt)(block_optpfor)(block_varint)(block_interpolative)(block_u32)(block_vbyte)(block_simple16)
+#define QS_INDEX_TYPES (ef)(single)(uniform)(opt)(block_optpfor)(block_varint)(block_interpolative)(block_u32)(block_vbyte)(block_simple16)(block_ansvbyte)

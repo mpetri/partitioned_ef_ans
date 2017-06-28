@@ -370,13 +370,11 @@ namespace quasi_succinct {
                                      uint32_t /* sum_of_values */, size_t n)
         {
             assert(n <= block_size);
-            size_t out_len = block_size;
             uint8_t const* ret;
 
             ret = reinterpret_cast<uint8_t const*>
                     (simple16_codec.decodeArray(reinterpret_cast<uint32_t const*>(in), 1,
                                                out, n));
-            assert(out_len == n);
             return ret;
         }
     };
