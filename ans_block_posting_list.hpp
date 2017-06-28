@@ -68,7 +68,6 @@ namespace quasi_succinct {
                     freqs_buf[i] = *freqs_it++ - 1;
                 }
                 *((uint32_t*)&out[begin_block_maxs + 4 * b]) = last_doc;
-
                 t_ansmodel::encode(docs_buf.data(), last_doc - block_base - (cur_block_size - 1),
                                    cur_block_size, out, doc_model);
                 t_ansmodel::encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out, freq_model);
@@ -207,11 +206,13 @@ namespace quasi_succinct {
 
             void QS_NOINLINE decode_docs_block(uint64_t block)
             {
+                
                 static const uint64_t block_size = t_ansmodel::block_size;
                 uint32_t endpoint = block
                     ? ((uint32_t const*)m_block_endpoints)[block - 1]
                     : 0;
                 uint8_t const* block_data = m_blocks_data + endpoint;
+
                 m_cur_block_size =
                     ((block + 1) * block_size <= size())
                     ? block_size : (size() % block_size);

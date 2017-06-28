@@ -36,3 +36,4 @@ test/test_ranked_queries
 test/test_sequence_collection
 test/test_strict_elias_fano
 test/test_uniform_partitioned_sequence
+test/test_ans_block_freq_index

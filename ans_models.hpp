@@ -97,7 +97,7 @@ void ans_normalize_counts_power_of_two(const uint64_t* counts,size_t num,uint32_
 
     uint32_t n = 0;
     uint64_t initial_sum = 0;
-    for (size_t i = 1; i < num; i++) {
+    for (size_t i = 0; i < num; i++) {
         if (norm_counts[i] != 0) {
             n = i + 1;
             initial_sum += norm_counts[i];
@@ -107,7 +107,7 @@ void ans_normalize_counts_power_of_two(const uint64_t* counts,size_t num,uint32_
        last bucket, assume it is the smallest n(s) area, scale
        the rest by the same amount */
     double C = double(target_power) / double(initial_sum);
-    for (size_t i = 1; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         norm_counts[i] = 0.95 * norm_counts[i] * C;
         if (counts[i] != 0 && norm_counts[i] < 1) {
             norm_counts[i] = 1;
@@ -124,7 +124,7 @@ void ans_normalize_counts_power_of_two(const uint64_t* counts,size_t num,uint32_
     /* flow that excess count backwards to the beginning of
        the selectors array, spreading it out across the buckets...
     */
-    for (int64_t m = int64_t(n - 1); m >= 1; m--) {
+    for (int64_t m = int64_t(n - 1); m >= 0; m--) {
         double ratio = double(excess) / double(M);
         uint64_t adder = ratio * norm_counts[m];
         if (adder > excess) {
@@ -134,7 +134,6 @@ void ans_normalize_counts_power_of_two(const uint64_t* counts,size_t num,uint32_
         M -= norm_counts[m];
         norm_counts[m] += adder;
     }
-    // print_array(nfreqs.begin(), n, "NC");
     if (excess != 0) {
         norm_counts[0] += excess;
     }
@@ -144,7 +143,8 @@ void ans_normalize_counts_power_of_two(const uint64_t* counts,size_t num,uint32_
         M += norm_counts[i];
     }
     if (!is_power_of_two(M)) {
-        std::cerr << "ERROR! not power of 2 after normalization = " << M;
+        std::cerr << "ERROR! not power of 2 after normalization = (" 
+            << M  << "," << target_power << ")" << std::endl;
         exit(EXIT_FAILURE);
     }
 }
@@ -195,7 +195,7 @@ namespace quasi_succinct {
     		model->M = t_frame_size;
     		model->mask_M = t_frame_size - 1;
     		model->log2_M = log2(t_frame_size);
-    		ans_normalize_counts_power_of_two(counts,constants::MAX_SIGMA,model->base,model->M);
+    		ans_normalize_counts_power_of_two(counts,constants::MAX_SIGMA,model->normalized_freqs,model->M);
     		uint32_t cumsum = 0;
     		for(size_t i=0;i<constants::MAX_SIGMA;i++) {
     			model->base[i] = cumsum;
@@ -256,7 +256,7 @@ namespace quasi_succinct {
 	        }
 
 	        // (2) transform state
-	        uint32_t next = ((state / f) << model->log2_M) + (state & model->mask_M) + b;
+	        uint32_t next = ((state / f) << model->log2_M) + (state % f) + b;
 	        return next;
     	}
 
@@ -277,7 +277,7 @@ namespace quasi_succinct {
 
 			// (2) write num vbytes we will encode
 			size_t num_vbytes = tmp_vbyte_buf.size();
-			TightVariableByte::encode_single(num_vbytes-n, out);
+            TightVariableByte::encode_single(num_vbytes-n, out);
 
 			// (3) ans encode to tmp buf
 			std::vector<uint8_t> buf(2 * 4 * n);
@@ -287,7 +287,7 @@ namespace quasi_succinct {
 			auto encin = tmp_vbyte_buf.data() + num_vbytes - 1;
 			for(size_t i=0;i<num_vbytes;i++) {
 				uint8_t sym = *encin--;
-				state = encode_sym(enc_model,state, sym, tmp_out_ptr);
+                state = encode_sym(enc_model,state, sym, tmp_out_ptr);
 			}
 			flush_state(state, tmp_out_ptr);
 			// as we encoded in reverse order, we have to write in into a tmp
@@ -299,7 +299,7 @@ namespace quasi_succinct {
 			out.insert(out.end(), tmp_out_ptr, tmp_out_ptr + enc_size);
     	}
 
-    	static uint32_t init_decoder(uint8_t const*& in,size_t enc_size)
+    	static uint32_t init_decoder(uint8_t const*& in,uint32_t& enc_size)
     	{
     		uint32_t const* in32 = reinterpret_cast<uint32_t const*>(in);
     		in += 4;
@@ -314,13 +314,14 @@ namespace quasi_succinct {
 
     		// (1) determine vbyte syms
     		uint32_t num_vb;
-    		TightVariableByte::decode(in, &num_vb, 1);
+    		in = TightVariableByte::decode(in, &num_vb, 1);
     		num_vb += n;
 
     		// (2) read num encoded syms
     		uint32_t enc_size = 0;
-    		TightVariableByte::decode(in, &enc_size, 1);
+    		in = TightVariableByte::decode(in, &enc_size, 1);
     		uint32_t state = init_decoder(in, enc_size);
+
     		uint8_t shift = 0;
     		uint32_t cur_num = 0;
     		for (uint32_t i = 0; i < num_vb; i++) {
