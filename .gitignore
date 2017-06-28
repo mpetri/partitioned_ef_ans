@@ -1,5 +1,7 @@
 data/
 test/temp.bin
+temp.bin
+.vscode
 
 # Python junk
 *.pyc
@@ -17,3 +19,20 @@ CMakeFiles/
 *.cmake
 Makefile
 Testing/
+
+create_freq_index
+create_wand_data
+queries
+test/test_block_codecs
+test/test_block_freq_index
+test/test_block_posting_list
+test/test_compact_elias_fano
+test/test_compact_ranked_bitvector
+test/test_freq_index
+test/test_indexed_sequence
+test/test_partitioned_sequence
+test/test_positive_sequence
+test/test_ranked_queries
+test/test_sequence_collection
+test/test_strict_elias_fano
+test/test_uniform_partitioned_sequence
