@@ -33,23 +33,23 @@ include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
 # add the root directory to include path to make includes absolute
-include_directories(${INDEX_PARTITIONING_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/)
 
-add_subdirectory(succinct EXCLUDE_FROM_ALL)
-add_subdirectory(FastPFor EXCLUDE_FROM_ALL)
+add_subdirectory(${CMAKE_SOURCE_DIR}/succinct EXCLUDE_FROM_ALL)
+add_subdirectory(${CMAKE_SOURCE_DIR}/FastPFor EXCLUDE_FROM_ALL)
 
 # bypass integer_encoding_library build system, only take what we need
-include_directories(${INDEX_PARTITIONING_SOURCE_DIR}/integer_encoding_library/include)
+include_directories(${CMAKE_SOURCE_DIR}/integer_encoding_library/include)
 add_library(block_codecs
-  block_codecs.cpp
-  integer_encoding_library/src/compress/table/decUnary.cpp
-  integer_encoding_library/src/compress/table/decGamma.cpp
-  integer_encoding_library/src/compress/table/decDelta.cpp
-  integer_encoding_library/src/io/BitsReader.cpp
-  integer_encoding_library/src/io/BitsWriter.cpp
+  ${CMAKE_SOURCE_DIR}/block_codecs.cpp
+  ${CMAKE_SOURCE_DIR}/integer_encoding_library/src/compress/table/decUnary.cpp
+  ${CMAKE_SOURCE_DIR}/integer_encoding_library/src/compress/table/decGamma.cpp
+  ${CMAKE_SOURCE_DIR}/integer_encoding_library/src/compress/table/decDelta.cpp
+  ${CMAKE_SOURCE_DIR}/integer_encoding_library/src/io/BitsReader.cpp
+  ${CMAKE_SOURCE_DIR}/integer_encoding_library/src/io/BitsWriter.cpp
   )
 
-add_executable(create_freq_index create_freq_index.cpp)
+add_executable(create_freq_index ${CMAKE_SOURCE_DIR}/create_freq_index.cpp)
 target_link_libraries(create_freq_index
   ${Boost_LIBRARIES}
   FastPFor_lib
@@ -57,12 +57,12 @@ target_link_libraries(create_freq_index
   pthread
   )
 
-add_executable(create_wand_data create_wand_data.cpp)
+add_executable(create_wand_data ${CMAKE_SOURCE_DIR}/create_wand_data.cpp)
 target_link_libraries(create_wand_data
   ${Boost_LIBRARIES}
   )
 
-add_executable(queries queries.cpp)
+add_executable(queries ${CMAKE_SOURCE_DIR}/queries.cpp)
 target_link_libraries(queries
   ${Boost_LIBRARIES}
   FastPFor_lib
