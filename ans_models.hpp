@@ -17,7 +17,8 @@ const uint64_t TOPFREQ = 1048576;
 const uint64_t MAXSTACKSIZE = 10000000;
 }
 
-template <uint32_t i> inline uint8_t ans_extract7bits(const uint64_t val)
+template <uint32_t i>
+inline uint8_t ans_extract7bits(const uint64_t val)
 {
     uint8_t v = static_cast<uint8_t>((val >> (7 * i)) & ((1ULL << 7) - 1));
     return v;
@@ -55,45 +56,44 @@ inline void ans_vbyte_freq_count(uint32_t x, uint64_t*& f)
     }
 }
 
-
 inline std::vector<uint8_t> ans_vbyte_encode(const uint32_t* in, uint32_t n)
 {
-	std::vector<uint8_t> out(n*4);
-	size_t j = 0;
-	for(uint32_t i=0;i<n;i++) {
-		uint32_t x = in[i];
-	    if (x < (1ULL << 7)) {
-	        out[j++] = static_cast<uint8_t>(x & 127);
-	    } else if (x < (1ULL << 14)) {
-	        out[j++] = ans_extract7bits<0>(x) | 128;
-	        out[j++] = ans_extract7bitsmaskless<1>(x) & 127;
-	    } else if (x < (1ULL << 21)) {
-	        out[j++] = ans_extract7bits<0>(x) | 128;
-	        out[j++] = ans_extract7bits<1>(x) | 128;
-	        out[j++] = ans_extract7bitsmaskless<2>(x) & 127;
-	    } else if (x < (1ULL << 28)) {
-	        out[j++] = ans_extract7bits<0>(x) | 128;
-	        out[j++] = ans_extract7bits<1>(x) | 128;
-	        out[j++] = ans_extract7bits<2>(x) | 128;
-	        out[j++] = ans_extract7bitsmaskless<3>(x) & 127;
-	    } else {
-	        out[j++] = ans_extract7bits<0>(x) | 128;
-	        out[j++] = ans_extract7bits<1>(x) | 128;
-	        out[j++] = ans_extract7bits<2>(x) | 128;
-	        out[j++] = ans_extract7bits<3>(x) | 128;
-	        out[j++] = ans_extract7bitsmaskless<4>(x) & 127;
-	    }
-	}
-	out.resize(j);
-	return std::move(out);
+    std::vector<uint8_t> out(n * 4);
+    size_t j = 0;
+    for (uint32_t i = 0; i < n; i++) {
+        uint32_t x = in[i];
+        if (x < (1ULL << 7)) {
+            out[j++] = static_cast<uint8_t>(x & 127);
+        } else if (x < (1ULL << 14)) {
+            out[j++] = ans_extract7bits<0>(x) | 128;
+            out[j++] = ans_extract7bitsmaskless<1>(x) & 127;
+        } else if (x < (1ULL << 21)) {
+            out[j++] = ans_extract7bits<0>(x) | 128;
+            out[j++] = ans_extract7bits<1>(x) | 128;
+            out[j++] = ans_extract7bitsmaskless<2>(x) & 127;
+        } else if (x < (1ULL << 28)) {
+            out[j++] = ans_extract7bits<0>(x) | 128;
+            out[j++] = ans_extract7bits<1>(x) | 128;
+            out[j++] = ans_extract7bits<2>(x) | 128;
+            out[j++] = ans_extract7bitsmaskless<3>(x) & 127;
+        } else {
+            out[j++] = ans_extract7bits<0>(x) | 128;
+            out[j++] = ans_extract7bits<1>(x) | 128;
+            out[j++] = ans_extract7bits<2>(x) | 128;
+            out[j++] = ans_extract7bits<3>(x) | 128;
+            out[j++] = ans_extract7bitsmaskless<4>(x) & 127;
+        }
+    }
+    out.resize(j);
+    return std::move(out);
 }
-
 
 bool is_power_of_two(uint64_t x) { return ((x != 0) && !(x & (x - 1))); }
 
-void ans_normalize_counts_power_of_two(const uint64_t* counts,size_t num,uint32_t* norm_counts, size_t target_power)
+void ans_normalize_counts_power_of_two(const uint64_t* counts, size_t num, uint32_t* norm_counts, size_t target_power)
 {
-    for(size_t i=0;i<num;i++) norm_counts[i] = counts[i];
+    for (size_t i = 0; i < num; i++)
+        norm_counts[i] = counts[i];
 
     uint32_t n = 0;
     uint64_t initial_sum = 0;
@@ -143,214 +143,211 @@ void ans_normalize_counts_power_of_two(const uint64_t* counts,size_t num,uint32_
         M += norm_counts[i];
     }
     if (!is_power_of_two(M)) {
-        std::cerr << "ERROR! not power of 2 after normalization = (" 
-            << M  << "," << target_power << ")" << std::endl;
+        std::cerr << "ERROR! not power of 2 after normalization = ("
+                  << M << "," << target_power << ")" << std::endl;
         exit(EXIT_FAILURE);
     }
 }
 
-
 namespace quasi_succinct {
 
-	struct ans_byte_enc_model {
-		uint32_t M;
-		uint32_t mask_M;
-		uint32_t log2_M;
-		uint32_t base[constants::MAX_SIGMA];
-		uint32_t normalized_freqs[constants::MAX_SIGMA];
-		uint32_t sym_upper_bound[constants::MAX_SIGMA];
-	};
+struct ans_byte_enc_model {
+    uint32_t M;
+    uint32_t mask_M;
+    uint32_t log2_M;
+    uint32_t base[constants::MAX_SIGMA];
+    uint32_t normalized_freqs[constants::MAX_SIGMA];
+    uint32_t sym_upper_bound[constants::MAX_SIGMA];
+};
 
-	struct dec_table_entry {
-	    uint16_t freq;
-	    uint16_t offset;
-	    uint32_t sym;
-	};
+struct dec_table_entry {
+    uint16_t freq;
+    uint16_t offset;
+    uint32_t sym;
+};
 
-	template<uint32_t t_frame_size>
-	struct ans_byte_dec_model {
-		uint32_t mask_M;
-		uint32_t log2_M;
-		uint64_t norm_lower_bound;
-		dec_table_entry table[t_frame_size];
-	};
+template <uint32_t t_frame_size>
+struct ans_byte_dec_model {
+    uint32_t mask_M;
+    uint32_t log2_M;
+    uint64_t norm_lower_bound;
+    dec_table_entry table[t_frame_size];
+};
 
-    template<uint32_t t_frame_size = 4096>
-    struct ans_vbyte_model {
-        static const uint64_t block_size = 128;
-    	const uint32_t frame_size = t_frame_size;
+template <uint32_t t_frame_size = 4096>
+struct ans_vbyte_model {
+    static const uint64_t block_size = 128;
+    const uint32_t frame_size = t_frame_size;
 
-    	static std::vector<uint8_t> create_empty_counts()
-    	{
-    		size_t count_size = constants::MAX_SIGMA * sizeof(uint64_t);
-    		return std::vector<uint8_t>(count_size,0);
-    	}
+    static std::vector<uint8_t> create_empty_counts()
+    {
+        size_t count_size = constants::MAX_SIGMA * sizeof(uint64_t);
+        return std::vector<uint8_t>(count_size, 0);
+    }
 
-    	static std::vector<uint8_t> create_enc_model_from_counts(const std::vector<uint8_t>& cntsu8)
-    	{
-    		auto counts =  reinterpret_cast<const uint64_t*>(cntsu8.data());
+    static std::vector<uint8_t> create_enc_model_from_counts(const std::vector<uint8_t>& cntsu8)
+    {
+        auto counts = reinterpret_cast<const uint64_t*>(cntsu8.data());
 
-    		std::vector<uint8_t> enc_model(sizeof(ans_byte_enc_model));
-    		auto model = reinterpret_cast<ans_byte_enc_model*>(enc_model.data());
-    		model->M = t_frame_size;
-    		model->mask_M = t_frame_size - 1;
-    		model->log2_M = log2(t_frame_size);
-    		ans_normalize_counts_power_of_two(counts,constants::MAX_SIGMA,model->normalized_freqs,model->M);
-    		uint32_t cumsum = 0;
-    		for(size_t i=0;i<constants::MAX_SIGMA;i++) {
-    			model->base[i] = cumsum;
-    			cumsum += model->normalized_freqs[i];
-    		}
+        std::vector<uint8_t> enc_model(sizeof(ans_byte_enc_model));
+        auto model = reinterpret_cast<ans_byte_enc_model*>(enc_model.data());
+        model->M = t_frame_size;
+        model->mask_M = t_frame_size - 1;
+        model->log2_M = log2(t_frame_size);
+        ans_normalize_counts_power_of_two(counts, constants::MAX_SIGMA, model->normalized_freqs, model->M);
+        uint32_t cumsum = 0;
+        for (size_t i = 0; i < constants::MAX_SIGMA; i++) {
+            model->base[i] = cumsum;
+            cumsum += model->normalized_freqs[i];
+        }
 
-    		uint32_t norm_lower_bound = constants::OUTPUT_BASE * model->M;
-	        for (size_t j = 0; j < constants::MAX_SIGMA; j++) {
-	            model->sym_upper_bound[j]
-	                = ((norm_lower_bound / model->M) * constants::OUTPUT_BASE)
-	                * model->normalized_freqs[j];
-	        }
+        uint32_t norm_lower_bound = constants::OUTPUT_BASE * model->M;
+        for (size_t j = 0; j < constants::MAX_SIGMA; j++) {
+            model->sym_upper_bound[j]
+                = ((norm_lower_bound / model->M) * constants::OUTPUT_BASE)
+                * model->normalized_freqs[j];
+        }
 
-    		return enc_model;
-    	}
+        return enc_model;
+    }
 
-    	static std::vector<uint8_t> create_dec_model(const std::vector<uint8_t>& enc_model_u8)
-    	{
-    		auto enc_model = reinterpret_cast<const ans_byte_enc_model*>(enc_model_u8.data());
-    		std::vector<uint8_t> dec_model_u8(sizeof(ans_byte_dec_model<t_frame_size>));
-    		auto dec_model = reinterpret_cast<ans_byte_dec_model<t_frame_size>*>(dec_model_u8.data());
-    		dec_model->mask_M = enc_model->mask_M;
-    		dec_model->log2_M = enc_model->log2_M;
-    		dec_model->norm_lower_bound = constants::OUTPUT_BASE * enc_model->M;
+    static std::vector<uint8_t> create_dec_model(const std::vector<uint8_t>& enc_model_u8)
+    {
+        auto enc_model = reinterpret_cast<const ans_byte_enc_model*>(enc_model_u8.data());
+        std::vector<uint8_t> dec_model_u8(sizeof(ans_byte_dec_model<t_frame_size>));
+        auto dec_model = reinterpret_cast<ans_byte_dec_model<t_frame_size>*>(dec_model_u8.data());
+        dec_model->mask_M = enc_model->mask_M;
+        dec_model->log2_M = enc_model->log2_M;
+        dec_model->norm_lower_bound = constants::OUTPUT_BASE * enc_model->M;
 
-    		uint32_t base = 0;
-        	for (size_t j = 0; j < constants::MAX_SIGMA; j++) {
-            	uint16_t cur_freq = enc_model->normalized_freqs[j];
-            	for (size_t k = 0; k < cur_freq; k++) {
-                	dec_model->table[base + k].sym = j;
-                	dec_model->table[base + k].freq = cur_freq;
-                	dec_model->table[base + k].offset = k;
-            	}
-            	base += cur_freq;
-        	}
+        uint32_t base = 0;
+        for (size_t j = 0; j < constants::MAX_SIGMA; j++) {
+            uint16_t cur_freq = enc_model->normalized_freqs[j];
+            for (size_t k = 0; k < cur_freq; k++) {
+                dec_model->table[base + k].sym = j;
+                dec_model->table[base + k].freq = cur_freq;
+                dec_model->table[base + k].offset = k;
+            }
+            base += cur_freq;
+        }
 
-    		return dec_model_u8;
-    	}
+        return dec_model_u8;
+    }
 
-    	static void model(std::vector<uint8_t>& cntsu8,uint32_t const* in, uint32_t /*sum_of_values*/,size_t n)
-    	{
-    		auto counts =  reinterpret_cast<uint64_t*>(cntsu8.data());
-    		for(size_t i=0;i<n;i++) {
-    			ans_vbyte_freq_count(in[i],counts);
-    		}
-    	}
+    static void model(std::vector<uint8_t>& cntsu8, uint32_t const* in, uint32_t /*sum_of_values*/, size_t n)
+    {
+        auto counts = reinterpret_cast<uint64_t*>(cntsu8.data());
+        for (size_t i = 0; i < n; i++) {
+            ans_vbyte_freq_count(in[i], counts);
+        }
+    }
 
-    	static uint32_t encode_sym(const ans_byte_enc_model* model,uint32_t state, uint8_t sym, uint8_t*& out8)
-    	{
-    		uint32_t f = model->normalized_freqs[sym];
-	        uint32_t b = model->base[sym];
-	        // (1) normalize
-	        uint32_t SUB = model->sym_upper_bound[sym];
-	        while (state >= SUB) {
-	            --out8;
-	            *out8 = (uint8_t)(state & 0xFF);
-	            state = state >> constants::OUTPUT_BASE_LOG2;
-	        }
+    static uint32_t encode_sym(const ans_byte_enc_model* model, uint32_t state, uint8_t sym, uint8_t*& out8)
+    {
+        uint32_t f = model->normalized_freqs[sym];
+        uint32_t b = model->base[sym];
+        // (1) normalize
+        uint32_t SUB = model->sym_upper_bound[sym];
+        while (state >= SUB) {
+            --out8;
+            *out8 = (uint8_t)(state & 0xFF);
+            state = state >> constants::OUTPUT_BASE_LOG2;
+        }
 
-	        // (2) transform state
-	        uint32_t next = ((state / f) << model->log2_M) + (state % f) + b;
-	        return next;
-    	}
+        // (2) transform state
+        uint32_t next = ((state / f) << model->log2_M) + (state % f) + b;
+        return next;
+    }
 
-    	static void flush_state(uint32_t final_state, uint8_t*& out8)
-	    {
-	        out8 -= sizeof(final_state);
-	        uint32_t* out32 = reinterpret_cast<uint32_t*>(out8);
-	        *out32 = final_state;
-	    }
+    static void flush_state(uint32_t final_state, uint8_t*& out8)
+    {
+        out8 -= sizeof(final_state);
+        uint32_t* out32 = reinterpret_cast<uint32_t*>(out8);
+        *out32 = final_state;
+    }
 
-    	static void encode(uint32_t const* in, uint32_t /* sum_of_values */,
-                           size_t n, std::vector<uint8_t>& out,const std::vector<uint8_t>& enc_model_u8)
-    	{
-    		auto enc_model = reinterpret_cast<const ans_byte_enc_model*>(enc_model_u8.data());
+    static void encode(uint32_t const* in, uint32_t /* sum_of_values */,
+        size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
+    {
+        auto enc_model = reinterpret_cast<const ans_byte_enc_model*>(enc_model_u8.data());
 
-    		// (1) encode vbyte
-			std::vector<uint8_t> tmp_vbyte_buf = ans_vbyte_encode(in,n);
+        // (1) encode vbyte
+        std::vector<uint8_t> tmp_vbyte_buf = ans_vbyte_encode(in, n);
 
-			// (2) write num vbytes we will encode
-			size_t num_vbytes = tmp_vbyte_buf.size();
-            TightVariableByte::encode_single(num_vbytes-n, out);
+        // (2) write num vbytes we will encode
+        size_t num_vbytes = tmp_vbyte_buf.size();
+        TightVariableByte::encode_single(num_vbytes - n, out);
 
-			// (3) ans encode to tmp buf
-			std::vector<uint8_t> buf(2 * 4 * n);
-			auto tmp_out_ptr = buf.data() + buf.size() - 1;
-			auto tmp_out_start = tmp_out_ptr;
-			auto state = constants::ANS_START_STATE;
-			auto encin = tmp_vbyte_buf.data() + num_vbytes - 1;
-			for(size_t i=0;i<num_vbytes;i++) {
-				uint8_t sym = *encin--;
-                state = encode_sym(enc_model,state, sym, tmp_out_ptr);
-			}
-			flush_state(state, tmp_out_ptr);
-			// as we encoded in reverse order, we have to write in into a tmp
-        	// buf and then output the written bytes
-        	size_t enc_size = (tmp_out_start - tmp_out_ptr);
-        	TightVariableByte::encode_single(enc_size, out);
+        // (3) ans encode to tmp buf
+        std::vector<uint8_t> buf(2 * 4 * n);
+        auto tmp_out_ptr = buf.data() + buf.size() - 1;
+        auto tmp_out_start = tmp_out_ptr;
+        auto state = constants::ANS_START_STATE;
+        auto encin = tmp_vbyte_buf.data() + num_vbytes - 1;
+        for (size_t i = 0; i < num_vbytes; i++) {
+            uint8_t sym = *encin--;
+            state = encode_sym(enc_model, state, sym, tmp_out_ptr);
+        }
+        flush_state(state, tmp_out_ptr);
+        // as we encoded in reverse order, we have to write in into a tmp
+        // buf and then output the written bytes
+        size_t enc_size = (tmp_out_start - tmp_out_ptr);
+        TightVariableByte::encode_single(enc_size, out);
 
-			// (4) copy to real out buf
-			out.insert(out.end(), tmp_out_ptr, tmp_out_ptr + enc_size);
-    	}
+        // (4) copy to real out buf
+        out.insert(out.end(), tmp_out_ptr, tmp_out_ptr + enc_size);
+    }
 
-    	static uint32_t init_decoder(uint8_t const*& in,uint32_t& enc_size)
-    	{
-    		uint32_t const* in32 = reinterpret_cast<uint32_t const*>(in);
-    		in += 4;
-    		enc_size -= 4;
-    		return *in32;
-    	}
+    static uint32_t init_decoder(uint8_t const*& in, uint32_t& enc_size)
+    {
+        uint32_t const* in32 = reinterpret_cast<uint32_t const*>(in);
+        in += 4;
+        enc_size -= 4;
+        return *in32;
+    }
 
-    	static uint8_t const* decode(uint8_t const* in, uint32_t* out,
-                                     uint32_t /* sum_of_values */, size_t n,uint8_t const* dec_model_u8)
-    	{
-    		auto model = reinterpret_cast<ans_byte_dec_model<t_frame_size> const*>(dec_model_u8);
+    static uint8_t const* decode(uint8_t const* in, uint32_t* out,
+        uint32_t /* sum_of_values */, size_t n, uint8_t const* dec_model_u8)
+    {
+        auto model = reinterpret_cast<ans_byte_dec_model<t_frame_size> const*>(dec_model_u8);
 
-    		// (1) determine vbyte syms
-    		uint32_t num_vb;
-    		in = TightVariableByte::decode(in, &num_vb, 1);
-    		num_vb += n;
+        // (1) determine vbyte syms
+        uint32_t num_vb;
+        in = TightVariableByte::decode(in, &num_vb, 1);
+        num_vb += n;
 
-    		// (2) read num encoded syms
-    		uint32_t enc_size = 0;
-    		in = TightVariableByte::decode(in, &enc_size, 1);
-    		uint32_t state = init_decoder(in, enc_size);
+        // (2) read num encoded syms
+        uint32_t enc_size = 0;
+        in = TightVariableByte::decode(in, &enc_size, 1);
+        uint32_t state = init_decoder(in, enc_size);
 
-    		uint8_t shift = 0;
-    		uint32_t cur_num = 0;
-    		for (uint32_t i = 0; i < num_vb; i++) {
+        uint8_t shift = 0;
+        uint32_t cur_num = 0;
+        for (uint32_t i = 0; i < num_vb; i++) {
 
-    			uint32_t state_mod_M = state & model->mask_M;
-        		const auto& entry = model->table[state_mod_M];
+            uint32_t state_mod_M = state & model->mask_M;
+            const auto& entry = model->table[state_mod_M];
 
-		        // update state and renormalize
-		        state = entry.freq * (state >> model->log2_M) + entry.offset;
-		        while (enc_size && state < model->norm_lower_bound) {
-		            uint8_t new_byte = *in++;
-		            state = (state << constants::OUTPUT_BASE_LOG2) | uint32_t(new_byte);
-		            enc_size--;
-		        }
+            // update state and renormalize
+            state = entry.freq * (state >> model->log2_M) + entry.offset;
+            while (enc_size && state < model->norm_lower_bound) {
+                uint8_t new_byte = *in++;
+                state = (state << constants::OUTPUT_BASE_LOG2) | uint32_t(new_byte);
+                enc_size--;
+            }
 
-		        uint8_t cur_sym = entry.sym;
-		        cur_num += (uint32_t(cur_sym & 127) << shift);
-		        if (!(cur_sym & 128)) {
-            		*out++ = cur_num;
-            		cur_num = 0;
-            		shift = 0;
-        		} else {
-        			shift += 7;
-        		}
-    		}
+            uint8_t cur_sym = entry.sym;
+            cur_num += (uint32_t(cur_sym & 127) << shift);
+            if (!(cur_sym & 128)) {
+                *out++ = cur_num;
+                cur_num = 0;
+                shift = 0;
+            } else {
+                shift += 7;
+            }
+        }
 
-    		return in;
-    	}
-
-    };
-
+        return in;
+    }
+};
 }

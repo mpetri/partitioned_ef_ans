@@ -1,13 +1,14 @@
 #include <fstream>
 #include <iostream>
 
-#include "succinct/mapper.hpp"
-#include "binary_freq_collection.hpp"
 #include "binary_collection.hpp"
-#include "wand_data.hpp"
+#include "binary_freq_collection.hpp"
+#include "succinct/mapper.hpp"
 #include "util.hpp"
+#include "wand_data.hpp"
 
-int main(int argc, const char** argv) {
+int main(int argc, const char** argv)
+{
 
     using namespace quasi_succinct;
 

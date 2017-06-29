@@ -3,24 +3,24 @@
 #include <succinct/mapper.hpp>
 
 #include "index_types.hpp"
-#include "wand_data.hpp"
 #include "queries.hpp"
 #include "util.hpp"
+#include "wand_data.hpp"
 
 template <typename QueryOperator, typename IndexType>
 void op_perftest(IndexType const& index,
-                 QueryOperator&& query_op, // XXX!!!
-                 std::vector<quasi_succinct::term_id_vec> const& queries,
-                 std::string const& index_type,
-                 std::string const& query_type,
-                 size_t runs)
+    QueryOperator&& query_op, // XXX!!!
+    std::vector<quasi_succinct::term_id_vec> const& queries,
+    std::string const& index_type,
+    std::string const& query_type,
+    size_t runs)
 {
     using namespace quasi_succinct;
 
     std::vector<double> query_times;
 
     for (size_t run = 0; run <= runs; ++run) {
-        for (auto const& query: queries) {
+        for (auto const& query : queries) {
             auto tick = get_time_usecs();
             uint64_t result = query_op(index, query);
             do_not_optimize_away(result);
@@ -32,7 +32,7 @@ void op_perftest(IndexType const& index,
     }
 
     if (false) {
-        for (auto t: query_times) {
+        for (auto t : query_times) {
             std::cout << (t / 1000) << std::endl;
         }
     } else {
@@ -47,23 +47,15 @@ void op_perftest(IndexType const& index,
         logger() << "90% quantile: " << q90 << std::endl;
         logger() << "95% quantile: " << q95 << std::endl;
 
-        stats_line()
-            ("type", index_type)
-            ("query", query_type)
-            ("avg", avg)
-            ("q50", q50)
-            ("q90", q90)
-            ("q95", q95)
-            ;
+        stats_line()("type", index_type)("query", query_type)("avg", avg)("q50", q50)("q90", q90)("q95", q95);
     }
 }
 
-
 template <typename IndexType>
 void perftest(const char* index_filename,
-              const char* wand_data_filename,
-              std::vector<quasi_succinct::term_id_vec> const& queries,
-              std::string const& type)
+    const char* wand_data_filename,
+    std::vector<quasi_succinct::term_id_vec> const& queries,
+    std::string const& type)
 {
     using namespace quasi_succinct;
 
@@ -87,7 +79,6 @@ void perftest(const char* index_filename,
         op_perftest(index, wand_query(wdata, 10), queries, type, "wand", 1);
         op_perftest(index, maxscore_query(wdata, 10), queries, type, "maxscore", 1);
     }
-
 }
 
 int main(int argc, const char** argv)
@@ -103,19 +94,20 @@ int main(int argc, const char** argv)
 
     std::vector<term_id_vec> queries;
     term_id_vec q;
-    while (read_query(q)) queries.push_back(q);
+    while (read_query(q))
+        queries.push_back(q);
 
     if (false) {
-#define LOOP_BODY(R, DATA, T)                                   \
-        } else if (type == BOOST_PP_STRINGIZE(T)) {             \
-            perftest<BOOST_PP_CAT(T, _index)>                   \
-                (index_filename, wand_data_filename, queries, type); \
-            /**/
+#define LOOP_BODY(R, DATA, T)                                                                 \
+    }                                                                                         \
+    else if (type == BOOST_PP_STRINGIZE(T))                                                   \
+    {                                                                                         \
+        perftest<BOOST_PP_CAT(T, _index)>(index_filename, wand_data_filename, queries, type); \
+        /**/
 
         BOOST_PP_SEQ_FOR_EACH(LOOP_BODY, _, QS_INDEX_TYPES);
 #undef LOOP_BODY
     } else {
         logger() << "ERROR: Unknown type " << type << std::endl;
     }
-
 }
