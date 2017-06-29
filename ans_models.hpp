@@ -17,15 +17,55 @@ const uint64_t TOPFREQ = 1048576;
 const uint64_t MAXSTACKSIZE = 10000000;
 }
 
+inline uint8_t ans_vbyte_size(uint64_t x)
+{
+    if (x < (1ULL << 7)) {
+        return 1;
+    } else if (x < (1ULL << 14)) {
+        return 2;
+    } else if (x < (1ULL << 21)) {
+        return 3;
+    } else if (x < (1ULL << 28)) {
+        return 4;
+    } else if (x < (1ULL << 35)) {
+        return 5;
+    } else if (x < (1ULL << 42)) {
+        return 6;
+    } else if (x < (1ULL << 49)) {
+        return 7;
+    } else if (x < (1ULL << 56)) {
+        return 8;
+    } else {
+        return 9;
+    }
+    return 9;
+}
+
+inline uint64_t ans_vbyte_decode_u32(const uint8_t*& input, uint32_t& enc_size)
+{
+    uint64_t x = 0;
+    uint64_t shift = 0;
+    while (true) {
+        uint8_t c = *input++;
+        enc_size--;
+        x += (uint32_t(c & 127) << shift);
+        if (!(c & 128)) {
+            return x;
+        }
+        shift += 7;
+    }
+    return x;
+}
+
 template <uint32_t i>
-inline uint8_t ans_extract7bits(const uint64_t val)
+inline uint8_t ans_extract7bits(const uint32_t val)
 {
     uint8_t v = static_cast<uint8_t>((val >> (7 * i)) & ((1ULL << 7) - 1));
     return v;
 }
 
 template <uint32_t i>
-inline uint8_t ans_extract7bitsmaskless(const uint64_t val)
+inline uint8_t ans_extract7bitsmaskless(const uint32_t val)
 {
     uint8_t v = static_cast<uint8_t>((val >> (7 * i)));
     return v;
@@ -53,6 +93,31 @@ inline void ans_vbyte_freq_count(uint32_t x, uint64_t*& f)
         f[ans_extract7bits<2>(x) | 128]++;
         f[ans_extract7bits<3>(x) | 128]++;
         f[ans_extract7bitsmaskless<4>(x) & 127]++;
+    }
+}
+
+inline void ans_vbyte_encode_u32(uint8_t*& out, uint32_t x)
+{
+    if (x < (1ULL << 7)) {
+        *out++ = static_cast<uint8_t>(x & 127);
+    } else if (x < (1ULL << 14)) {
+        *out++ = ans_extract7bits<0>(x) | 128;
+        *out++ = ans_extract7bitsmaskless<1>(x) & 127;
+    } else if (x < (1ULL << 21)) {
+        *out++ = ans_extract7bits<0>(x) | 128;
+        *out++ = ans_extract7bits<1>(x) | 128;
+        *out++ = ans_extract7bitsmaskless<2>(x) & 127;
+    } else if (x < (1ULL << 28)) {
+        *out++ = ans_extract7bits<0>(x) | 128;
+        *out++ = ans_extract7bits<1>(x) | 128;
+        *out++ = ans_extract7bits<2>(x) | 128;
+        *out++ = ans_extract7bitsmaskless<3>(x) & 127;
+    } else {
+        *out++ = ans_extract7bits<0>(x) | 128;
+        *out++ = ans_extract7bits<1>(x) | 128;
+        *out++ = ans_extract7bits<2>(x) | 128;
+        *out++ = ans_extract7bits<3>(x) | 128;
+        *out++ = ans_extract7bitsmaskless<4>(x) & 127;
     }
 }
 
@@ -261,9 +326,10 @@ struct ans_vbyte_model {
 
     static void flush_state(uint32_t final_state, uint8_t*& out8)
     {
-        out8 -= sizeof(final_state);
-        uint32_t* out32 = reinterpret_cast<uint32_t*>(out8);
-        *out32 = final_state;
+        auto vb_bytes = ans_vbyte_size(final_state);
+        out8 -= vb_bytes;
+        auto tmp = out8;
+        ans_vbyte_encode_u32(tmp, final_state);
     }
 
     static void encode(uint32_t const* in, uint32_t /* sum_of_values */,
@@ -300,10 +366,7 @@ struct ans_vbyte_model {
 
     static uint32_t init_decoder(uint8_t const*& in, uint32_t& enc_size)
     {
-        uint32_t const* in32 = reinterpret_cast<uint32_t const*>(in);
-        in += 4;
-        enc_size -= 4;
-        return *in32;
+        return ans_vbyte_decode_u32(in, enc_size);
     }
 
     static uint8_t const* decode(uint8_t const* in, uint32_t* out,
