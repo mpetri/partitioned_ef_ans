@@ -2,6 +2,7 @@ data/
 test/temp.bin
 temp.bin
 .vscode
+build
 
 # Python junk
 *.pyc
