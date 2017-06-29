@@ -301,6 +301,8 @@ struct ans_vbyte_model {
 
     static void model(std::vector<uint8_t>& cntsu8, uint32_t const* in, uint32_t /*sum_of_values*/, size_t n)
     {
+        if (n != ans_vbyte_model::block_size)
+            return;
         auto counts = reinterpret_cast<uint64_t*>(cntsu8.data());
         for (size_t i = 0; i < n; i++) {
             ans_vbyte_freq_count(in[i], counts);
