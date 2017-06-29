@@ -189,10 +189,12 @@ void ans_normalize_counts_power_of_two(const uint64_t* counts, size_t num, uint3
         }
         /* do we have to try again? */
         if (M > target_power) {
+            std::cout << "ans-normalization: first phase failed. M=" << M << " target_power=" << target_power << ". ";
             for (size_t i = 0; i < n; i++) {
                 norm_counts[i] = counts[i];
             }
             fudge_factor -= 0.025;
+            std::cout << "new fudge_factor=" << fudge_factor << std::endl;
         } else {
             break;
         }
