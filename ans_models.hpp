@@ -321,6 +321,7 @@ struct ans_vbyte_model {
 
         // (2) transform state
         uint32_t next = ((state / f) << model->log2_M) + (state % f) + b;
+        assert(next == 0 || next > constants::OUTPUT_BASE * model->M);
         return next;
     }
 
@@ -336,6 +337,15 @@ struct ans_vbyte_model {
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
         auto enc_model = reinterpret_cast<const ans_byte_enc_model*>(enc_model_u8.data());
+
+        if (n != ans_vbyte_model::block_size) {
+            static TightVariableByte vbyte_codec;
+            std::vector<uint8_t> buf(2 * 4 * block_size);
+            size_t out_len = buf.size();
+            vbyte_codec.encode(in, n, buf.data(), out_len);
+            out.insert(out.end(), buf.data(), buf.data() + out_len);
+            return;
+        }
 
         // (1) encode vbyte
         std::vector<uint8_t> tmp_vbyte_buf = ans_vbyte_encode(in, n);
@@ -373,6 +383,11 @@ struct ans_vbyte_model {
         uint32_t /* sum_of_values */, size_t n, uint8_t const* dec_model_u8)
     {
         auto model = reinterpret_cast<ans_byte_dec_model<t_frame_size> const*>(dec_model_u8);
+
+        if (n != ans_vbyte_model::block_size) {
+            static TightVariableByte vbyte_codec;
+            return vbyte_codec.decode(in, out, n);
+        }
 
         // (1) determine vbyte syms
         uint32_t num_vb;
