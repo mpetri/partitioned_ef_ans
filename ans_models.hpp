@@ -171,21 +171,35 @@ void ans_normalize_counts_power_of_two(const uint64_t* counts, size_t num, uint3
     /* first phase in scaling process, distribute out the
        last bucket, assume it is the smallest n(s) area, scale
        the rest by the same amount */
-    double C = double(target_power) / double(initial_sum);
-    for (size_t i = 0; i < n; i++) {
-        norm_counts[i] = 0.95 * norm_counts[i] * C;
-        if (counts[i] != 0 && norm_counts[i] < 1) {
-            norm_counts[i] = 1;
-        }
-    }
-
-    /* now, what does it all add up to? */
+    double fudge_factor = 0.95;
     uint64_t M = 0;
-    for (size_t m = 0; m < n; m++) {
-        M += norm_counts[m];
+    while (true) {
+        double C = double(target_power) / double(initial_sum);
+        for (size_t i = 0; i < n; i++) {
+            norm_counts[i] = fudge_factor * norm_counts[i] * C;
+            if (counts[i] != 0 && norm_counts[i] < 1) {
+                norm_counts[i] = 1;
+            }
+        }
+
+        /* now, what does it all add up to? */
+        M = 0;
+        for (size_t m = 0; m < n; m++) {
+            M += norm_counts[m];
+        }
+        /* do we have to try again? */
+        if (M > target_power) {
+            for (size_t i = 0; i < n; i++) {
+                norm_counts[i] = counts[i];
+            }
+            fudge_factor -= 0.025;
+        } else {
+            break;
+        }
     }
     /* fourth phase, round up to a power of two and then redistribute */
     uint64_t excess = target_power - M;
+
     /* flow that excess count backwards to the beginning of
        the selectors array, spreading it out across the buckets...
     */
