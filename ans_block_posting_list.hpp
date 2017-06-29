@@ -189,7 +189,7 @@ namespace quasi_succinct {
                     uint8_t const* freq_ptr =
                         t_ansmodel::decode(ptr, buf.data(),
                                            block_max(b) - cur_base - (cur_block_size - 1),
-                                           cur_block_size,m_freqs_model_data);
+                                           cur_block_size,m_doc_model_data);
                     ptr = t_ansmodel::decode(freq_ptr, buf.data(),
                                              uint32_t(-1), cur_block_size,m_freqs_model_data);
                     bytes += ptr - freq_ptr;
