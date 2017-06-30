@@ -332,7 +332,7 @@ struct ans_vbyte_model {
         }
     }
 
-    static uint32_t encode_sym(const ans_byte_enc_model* model, uint32_t state, uint8_t sym, uint8_t*& out8)
+    static uint32_t encode_sym(const ans_byte_enc_model* model, uint32_t state, uint8_t sym, uint8_t*& out8, int bid)
     {
         uint32_t f = model->normalized_freqs[sym];
         uint32_t b = model->base[sym];
@@ -344,8 +344,39 @@ struct ans_vbyte_model {
             state = state >> constants::OUTPUT_BASE_LOG2;
         }
 
+        double expected_increase = double(model->M) / double(model->normalized_freqs[sym]);
+        double ei_log2 = log2(expected_increase);
+
         // (2) transform state
         uint32_t next = ((state / f) << model->log2_M) + (state % f) + b;
+
+        static int last_bid = -1;
+        static double cum_expected_space_bits = 0.0;
+
+        if (last_bid != bid) {
+            cum_expected_space_bits = 0.0;
+            cum_actual_space_bits = 0.0;
+            last_bid = bid;
+        }
+
+        double actual_increase = double(next) - double(state);
+        double ai_log2 = 0;
+        if (actual_increase != 0)
+            ai_log2 = log2(actual_increase);
+
+        cum_expected_space_bits += ei_log2;
+        cum_actual_space_bits += ai_log2;
+
+        std::cout << bid << ";"
+                  << (int)sym << ";"
+                  << double(model->normalized_freqs[sym]) / double(model->M) << ";"
+                  << expected_increase << ";"
+                  << ei_log2 << ";"
+                  << cum_expected_space_bits << ";"
+                  << actual_increase << ";"
+                  << ai_log2 << ";"
+                  << cum_actual_space_bits << std::endl;
+
         assert(next == 0 || next > constants::OUTPUT_BASE * model->M);
         return next;
     }
@@ -385,10 +416,14 @@ struct ans_vbyte_model {
         auto tmp_out_start = tmp_out_ptr;
         auto state = constants::ANS_START_STATE;
         auto encin = tmp_vbyte_buf.data() + num_vbytes - 1;
+
+        static int bid = 0;
+
         for (size_t i = 0; i < num_vbytes; i++) {
             uint8_t sym = *encin--;
-            state = encode_sym(enc_model, state, sym, tmp_out_ptr);
+            state = encode_sym(enc_model, state, sym, tmp_out_ptr, bid);
         }
+        bid++;
         flush_state(state, tmp_out_ptr);
         // as we encoded in reverse order, we have to write in into a tmp
         // buf and then output the written bytes
