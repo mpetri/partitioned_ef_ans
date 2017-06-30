@@ -351,6 +351,7 @@ struct ans_vbyte_model {
         uint32_t next = ((state / f) << model->log2_M) + (state % f) + b;
 
         static int last_bid = -1;
+        static int in_block_offset = 0;
         static double cum_expected_space_bits = 0.0;
         static double cum_actual_space_bits = 0.0;
 
@@ -358,6 +359,7 @@ struct ans_vbyte_model {
             cum_expected_space_bits = 0.0;
             cum_actual_space_bits = 0.0;
             last_bid = bid;
+            in_block_offset = 0;
         }
 
         double actual_increase = double(next) - double(state);
@@ -369,6 +371,7 @@ struct ans_vbyte_model {
         cum_actual_space_bits += ai_log2;
 
         std::cout << bid << ";"
+                  << in_block_offset << ";"
                   << (int)sym << ";"
                   << double(model->normalized_freqs[sym]) / double(model->M) << ";"
                   << expected_increase << ";"
@@ -377,6 +380,7 @@ struct ans_vbyte_model {
                   << actual_increase << ";"
                   << ai_log2 << ";"
                   << cum_actual_space_bits << std::endl;
+        in_block_offset++;
 
         assert(next == 0 || next > constants::OUTPUT_BASE * model->M);
         return next;
