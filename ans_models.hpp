@@ -352,6 +352,7 @@ struct ans_vbyte_model {
 
         static int last_bid = -1;
         static double cum_expected_space_bits = 0.0;
+        static double cum_actual_space_bits = 0.0;
 
         if (last_bid != bid) {
             cum_expected_space_bits = 0.0;
