@@ -21,10 +21,20 @@ struct ans_block_posting_list {
         std::vector<uint32_t> freqs_buf(block_size);
         uint32_t last_doc(-1);
         uint32_t block_base = 0;
+        static uint64_t full_block_postings = 0;
+        static uint64_t nonfull_block_postings = 0;
+        static uint64_t total_postings = 0;
         for (size_t b = 0; b < blocks; ++b) {
             uint32_t cur_block_size = ((b + 1) * block_size <= n)
                 ? block_size
                 : (n % block_size);
+
+            total_postings += cur_block_size;
+            if (cur_block_size == block_size) {
+                full_block_postings += block_size;
+            } else {
+                nonfull_block_postings += cur_block_size;
+            }
 
             for (size_t i = 0; i < cur_block_size; ++i) {
                 uint32_t doc(*docs_it++);
@@ -36,6 +46,10 @@ struct ans_block_posting_list {
             t_ansmodel::model(freq_model, freqs_buf.data(), uint32_t(-1), cur_block_size);
             block_base = last_doc + 1;
         }
+
+        std::cout << "total_postings = " << total_postings << std::endl;
+        std::cout << "nonfull_block_postings = " << nonfull_block_postings << std::endl;
+        std::cout << "full_block_postings = " << full_block_postings << std::endl;
     }
 
     template <typename DocsIterator, typename FreqsIterator>

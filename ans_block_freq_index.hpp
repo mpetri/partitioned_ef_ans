@@ -52,8 +52,6 @@ public:
             m_freq_enc_model = t_ansmodel::create_enc_model_from_counts(m_freq_counts);
             m_doc_dec_model = t_ansmodel::create_dec_model(m_doc_enc_model);
             m_freq_dec_model = t_ansmodel::create_dec_model(m_freq_enc_model);
-
-            std::cout << "bid;in_block_offset;sym;prob;expected_increase;expected_bits;cum_expected_bits;actual_increase;actual_bits;cum_actual_bits\n";
         }
 
         void build(ans_block_freq_index& sq)
