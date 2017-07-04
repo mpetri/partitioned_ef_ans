@@ -71,6 +71,12 @@ struct ans_block_posting_list {
         std::vector<uint32_t> freqs_buf(block_size);
         uint32_t last_doc(-1);
         uint32_t block_base = 0;
+
+        static size_nonfull_docs = 0;
+        static size_nonfull_freqs = 0;
+        static size_full_docs = 0;
+        static size_full_freqs = 0;
+
         for (size_t b = 0; b < blocks; ++b) {
             uint32_t cur_block_size = ((b + 1) * block_size <= n)
                 ? block_size
@@ -83,15 +89,41 @@ struct ans_block_posting_list {
 
                 freqs_buf[i] = *freqs_it++ - 1;
             }
+
+            size_t size_before = out.size();
+
             *((uint32_t*)&out[begin_block_maxs + 4 * b]) = last_doc;
             t_ansmodel::encode(docs_buf.data(), last_doc - block_base - (cur_block_size - 1),
                 cur_block_size, out, doc_model);
+
+            size_t size_after = out.size();
+            if (cur_block_size != block_size) {
+                size_nonfull_docs += (size_after - size_before);
+            } else {
+                size_full_docs += (size_after - size_before);
+            }
+            size_before = size_after;
+
             t_ansmodel::encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out, freq_model);
+
+            size_after = out.size();
+            if (cur_block_size != block_size) {
+                size_nonfull_freqs += (size_after - size_before);
+            } else {
+                size_full_freqs += (size_after - size_before);
+            }
+
             if (b != blocks - 1) {
                 *((uint32_t*)&out[begin_block_endpoints + 4 * b]) = out.size() - begin_blocks;
             }
             block_base = last_doc + 1;
         }
+
+        std::cout << "size_full_docs = " << size_full_freqs << std::endl;
+        std::cout << "size_nonfull_docs = " << size_nonfull_freqs << std::endl;
+
+        std::cout << "size_full_freqs = " << size_full_freqs << std::endl;
+        std::cout << "size_nonfull_freqs = " << size_nonfull_freqs << std::endl;
     }
 
     class document_enumerator {

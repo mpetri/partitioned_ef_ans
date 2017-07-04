@@ -22,6 +22,11 @@ struct block_posting_list {
         size_t begin_blocks = begin_block_endpoints + 4 * (blocks - 1);
         out.resize(begin_blocks);
 
+        static size_nonfull_docs = 0;
+        static size_nonfull_freqs = 0;
+        static size_full_docs = 0;
+        static size_full_freqs = 0;
+
         DocsIterator docs_it(docs_begin);
         FreqsIterator freqs_it(freqs_begin);
         std::vector<uint32_t> docs_buf(block_size);
@@ -42,14 +47,39 @@ struct block_posting_list {
             }
             *((uint32_t*)&out[begin_block_maxs + 4 * b]) = last_doc;
 
+            size_t size_before = out.size();
+
             BlockCodec::encode(docs_buf.data(), last_doc - block_base - (cur_block_size - 1),
                 cur_block_size, out);
+
+            size_t size_after = out.size();
+            if (cur_block_size != block_size) {
+                size_nonfull_docs += (size_after - size_before);
+            } else {
+                size_full_docs += (size_after - size_before);
+            }
+            size_before = size_after;
+
             BlockCodec::encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out);
+
+            size_after = out.size();
+            if (cur_block_size != block_size) {
+                size_nonfull_freqs += (size_after - size_before);
+            } else {
+                size_full_freqs += (size_after - size_before);
+            }
+
             if (b != blocks - 1) {
                 *((uint32_t*)&out[begin_block_endpoints + 4 * b]) = out.size() - begin_blocks;
             }
             block_base = last_doc + 1;
         }
+
+        std::cout << "size_full_docs = " << size_full_freqs << std::endl;
+        std::cout << "size_nonfull_docs = " << size_nonfull_freqs << std::endl;
+
+        std::cout << "size_full_freqs = " << size_full_freqs << std::endl;
+        std::cout << "size_nonfull_freqs = " << size_nonfull_freqs << std::endl;
     }
 
     class document_enumerator {
