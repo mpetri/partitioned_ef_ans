@@ -22,10 +22,10 @@ struct block_posting_list {
         size_t begin_blocks = begin_block_endpoints + 4 * (blocks - 1);
         out.resize(begin_blocks);
 
-        static size_nonfull_docs = 0;
-        static size_nonfull_freqs = 0;
-        static size_full_docs = 0;
-        static size_full_freqs = 0;
+        static size_t size_nonfull_docs = 0;
+        static size_t size_nonfull_freqs = 0;
+        static size_t size_full_docs = 0;
+        static size_t size_full_freqs = 0;
 
         DocsIterator docs_it(docs_begin);
         FreqsIterator freqs_it(freqs_begin);

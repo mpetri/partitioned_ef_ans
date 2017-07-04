@@ -72,10 +72,10 @@ struct ans_block_posting_list {
         uint32_t last_doc(-1);
         uint32_t block_base = 0;
 
-        static size_nonfull_docs = 0;
-        static size_nonfull_freqs = 0;
-        static size_full_docs = 0;
-        static size_full_freqs = 0;
+        static size_t size_nonfull_docs = 0;
+        static size_t size_nonfull_freqs = 0;
+        static size_t size_full_docs = 0;
+        static size_t size_full_freqs = 0;
 
         for (size_t b = 0; b < blocks; ++b) {
             uint32_t cur_block_size = ((b + 1) * block_size <= n)
