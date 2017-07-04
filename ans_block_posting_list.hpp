@@ -119,8 +119,8 @@ struct ans_block_posting_list {
             block_base = last_doc + 1;
         }
 
-        std::cout << "size_full_docs = " << size_full_freqs << std::endl;
-        std::cout << "size_nonfull_docs = " << size_nonfull_freqs << std::endl;
+        std::cout << "size_full_docs = " << size_full_docs << std::endl;
+        std::cout << "size_nonfull_docs = " << size_nonfull_docs << std::endl;
 
         std::cout << "size_full_freqs = " << size_full_freqs << std::endl;
         std::cout << "size_nonfull_freqs = " << size_nonfull_freqs << std::endl;
