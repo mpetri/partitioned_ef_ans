@@ -35,10 +35,11 @@ struct ans_block_posting_list {
                 freqs_buf[i] = *freqs_it++ - 1;
             }
 
-            if (cur_block_size == block_size) {
+            if (n >= 100000) {
                 t_ansmodel::model(doc_model, docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size);
                 t_ansmodel::model(freq_model, freqs_buf.data(), uint32_t(-1), cur_block_size);
-            } else {
+            }
+            if (n <= 1000) {
                 t_ansmodel::model(last_doc_model, docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size);
                 t_ansmodel::model(last_freq_model, freqs_buf.data(), uint32_t(-1), cur_block_size);
             }

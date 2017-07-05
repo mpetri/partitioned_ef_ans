@@ -56,11 +56,11 @@ public:
             auto last_doc_enc_model = t_ansmodel::create_enc_model_from_counts(m_last_doc_counts);
             auto last_freq_enc_model = t_ansmodel::create_enc_model_from_counts(m_last_freq_counts);
 
-            t_ansmodel::print_enc_model(m_doc_enc_model, "doc");
-            t_ansmodel::print_enc_model(last_doc_enc_model, "doc_last");
+            t_ansmodel::print_enc_model(m_doc_enc_model, "geq_100k;doc");
+            t_ansmodel::print_enc_model(last_doc_enc_model, "leq_1k;doc");
 
-            t_ansmodel::print_enc_model(m_freq_enc_model, "freq");
-            t_ansmodel::print_enc_model(last_freq_enc_model, "freq_last");
+            t_ansmodel::print_enc_model(m_freq_enc_model, "geq_100k;freq");
+            t_ansmodel::print_enc_model(last_freq_enc_model, "leq_1k;freq");
 
             m_doc_dec_model = t_ansmodel::create_dec_model(m_doc_enc_model);
             m_freq_dec_model = t_ansmodel::create_dec_model(m_freq_enc_model);
