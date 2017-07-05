@@ -10,7 +10,8 @@ template <typename t_ansmodel>
 struct ans_block_posting_list {
 
     template <typename DocsIterator, typename FreqsIterator>
-    static void model(std::vector<uint8_t>& doc_model, std::vector<uint8_t>& freq_model, uint32_t n,
+    static void model(std::vector<uint8_t>& doc_model, std::vector<uint8_t>& freq_model,
+        std::vector<uint8_t>& last_doc_model, std::vector<uint8_t>& last_freq_model, uint32_t n,
         DocsIterator docs_begin, FreqsIterator freqs_begin)
     {
         uint64_t block_size = t_ansmodel::block_size;
@@ -21,20 +22,11 @@ struct ans_block_posting_list {
         std::vector<uint32_t> freqs_buf(block_size);
         uint32_t last_doc(-1);
         uint32_t block_base = 0;
-        static uint64_t full_block_postings = 0;
-        static uint64_t nonfull_block_postings = 0;
-        static uint64_t total_postings = 0;
+
         for (size_t b = 0; b < blocks; ++b) {
             uint32_t cur_block_size = ((b + 1) * block_size <= n)
                 ? block_size
                 : (n % block_size);
-
-            total_postings += cur_block_size;
-            if (cur_block_size == block_size) {
-                full_block_postings += block_size;
-            } else {
-                nonfull_block_postings += cur_block_size;
-            }
 
             for (size_t i = 0; i < cur_block_size; ++i) {
                 uint32_t doc(*docs_it++);
@@ -42,14 +34,16 @@ struct ans_block_posting_list {
                 last_doc = doc;
                 freqs_buf[i] = *freqs_it++ - 1;
             }
-            t_ansmodel::model(doc_model, docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size);
-            t_ansmodel::model(freq_model, freqs_buf.data(), uint32_t(-1), cur_block_size);
+
+            if (cur_block_size == block_size) {
+                t_ansmodel::model(doc_model, docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size);
+                t_ansmodel::model(freq_model, freqs_buf.data(), uint32_t(-1), cur_block_size);
+            } else {
+                t_ansmodel::model(last_doc_model, docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size);
+                t_ansmodel::model(last_freq_model, freqs_buf.data(), uint32_t(-1), cur_block_size);
+            }
             block_base = last_doc + 1;
         }
-
-        std::cout << "total_postings = " << total_postings << std::endl;
-        std::cout << "nonfull_block_postings = " << nonfull_block_postings << std::endl;
-        std::cout << "full_block_postings = " << full_block_postings << std::endl;
     }
 
     template <typename DocsIterator, typename FreqsIterator>
@@ -72,11 +66,6 @@ struct ans_block_posting_list {
         uint32_t last_doc(-1);
         uint32_t block_base = 0;
 
-        static size_t size_nonfull_docs = 0;
-        static size_t size_nonfull_freqs = 0;
-        static size_t size_full_docs = 0;
-        static size_t size_full_freqs = 0;
-
         for (size_t b = 0; b < blocks; ++b) {
             uint32_t cur_block_size = ((b + 1) * block_size <= n)
                 ? block_size
@@ -90,40 +79,17 @@ struct ans_block_posting_list {
                 freqs_buf[i] = *freqs_it++ - 1;
             }
 
-            size_t size_before = out.size();
-
             *((uint32_t*)&out[begin_block_maxs + 4 * b]) = last_doc;
             t_ansmodel::encode(docs_buf.data(), last_doc - block_base - (cur_block_size - 1),
                 cur_block_size, out, doc_model);
 
-            size_t size_after = out.size();
-            if (cur_block_size != block_size) {
-                size_nonfull_docs += (size_after - size_before);
-            } else {
-                size_full_docs += (size_after - size_before);
-            }
-            size_before = size_after;
-
             t_ansmodel::encode(freqs_buf.data(), uint32_t(-1), cur_block_size, out, freq_model);
-
-            size_after = out.size();
-            if (cur_block_size != block_size) {
-                size_nonfull_freqs += (size_after - size_before);
-            } else {
-                size_full_freqs += (size_after - size_before);
-            }
 
             if (b != blocks - 1) {
                 *((uint32_t*)&out[begin_block_endpoints + 4 * b]) = out.size() - begin_blocks;
             }
             block_base = last_doc + 1;
         }
-
-        std::cout << "size_full_docs = " << size_full_docs << std::endl;
-        std::cout << "size_nonfull_docs = " << size_nonfull_docs << std::endl;
-
-        std::cout << "size_full_freqs = " << size_full_freqs << std::endl;
-        std::cout << "size_nonfull_freqs = " << size_nonfull_freqs << std::endl;
     }
 
     class document_enumerator {

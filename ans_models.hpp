@@ -323,6 +323,14 @@ struct ans_vbyte_model {
         }
     }
 
+    static void print_enc_model(const std::vector<uint8_t>& enc_model_u8, std::string name)
+    {
+        auto enc_model = reinterpret_cast<const ans_byte_enc_model*>(enc_model_u8.data());
+        for (size_t i = 0; i < constants::MAX_SIGMA; i++) {
+            std::cout << name << ";" << i << ";" << enc_model->normalized_freqs[i];
+        }
+    }
+
     static uint32_t encode_sym(const ans_byte_enc_model* model, uint32_t state, uint8_t sym, uint8_t*& out8)
     {
         uint32_t f = model->normalized_freqs[sym];
