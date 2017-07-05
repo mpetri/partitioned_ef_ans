@@ -327,7 +327,7 @@ struct ans_vbyte_model {
     {
         auto enc_model = reinterpret_cast<const ans_byte_enc_model*>(enc_model_u8.data());
         for (size_t i = 0; i < constants::MAX_SIGMA; i++) {
-            std::cout << name << ";" << i << ";" << enc_model->normalized_freqs[i];
+            std::cout << name << ";" << i << ";" << enc_model->normalized_freqs[i] << std::endl;
         }
     }
 
