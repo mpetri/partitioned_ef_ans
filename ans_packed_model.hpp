@@ -81,8 +81,17 @@ struct ans_packed_enc_model {
 
 struct ans_packed_mag_table {
     uint32_t max_value;
-    uint64_t counts[ans_packed_constants::MAX_MAG];
+    uint64_t counts[ans_packed_constants::MAX_MAG + 1];
 };
+
+void print_mag_table(const ans_packed_mag_table* tb, std::string name)
+{
+    std::cout << name << " max_value = " << tb->max_value << " COUNTS = (";
+    for (size_t i = 0; i <= ans_packed_constants::MAX_MAG; i++) {
+        std::cout << "<" << i << "," << tb->counts[i] << ">";
+    }
+    std::cout << ")" << std::endl;
+}
 
 struct ans_packed_dec_model {
     uint32_t M = 0; // frame size
@@ -107,16 +116,17 @@ struct ans_packed_model {
 
     static ans_packed_mag_table* normalize_counts(const ans_packed_mag_table* table)
     {
+        print_mag_table(table, "initial_freqs");
         ans_packed_mag_table* nfreqs = new ans_packed_mag_table;
         nfreqs->max_value = table->max_value;
         uint64_t initial_sum = 0;
-        for (size_t i = 0; i < ans_packed_constants::MAX_MAG; i++) {
+        for (size_t i = 0; i <= ans_packed_constants::MAX_MAG; i++) {
             initial_sum += table->counts[i] * ans_uniq_vals_in_mag(i, table->max_value);
             nfreqs->counts[i] = table->counts[i];
         }
 
         uint8_t max_mag = 0;
-        for (size_t i = 0; i < ans_packed_constants::MAX_MAG; i++) {
+        for (size_t i = 0; i <= ans_packed_constants::MAX_MAG; i++) {
             if (nfreqs->counts[i] != 0)
                 max_mag = i;
         }
@@ -132,6 +142,7 @@ struct ans_packed_model {
                 nfreqs->counts[m] = 1;
             }
         }
+        print_mag_table(nfreqs, "first_phase");
         /* second step in scaling process, to make the first freq
            less than or equal to TOPFREQ
         */
@@ -149,6 +160,7 @@ struct ans_packed_model {
                 }
             }
         }
+        print_mag_table(nfreqs, "second_phase");
 
         /* now, what does it all add up to? */
         uint64_t M = 0;
@@ -171,6 +183,7 @@ struct ans_packed_model {
         if (excess != 0) {
             nfreqs->counts[0] += excess;
         }
+        print_mag_table(nfreqs, "final_phase");
 
         M = 0;
         for (size_t i = 0; i <= max_mag; i++) {
@@ -185,45 +198,46 @@ struct ans_packed_model {
         return nfreqs;
     }
 
-    static bool create_enc_model(std::vector<uint8_t>& enc_models, const ans_packed_mag_table* table)
+    static bool create_enc_model(std::vector<uint8_t>& enc_models, const ans_packed_mag_table& table)
     {
         // (0) if all is 0 do nothing
-        if (std::all_of(table->counts, table->counts + ans_packed_constants::MAX_MAG,
+        if (std::all_of(table.counts, table.counts + ans_packed_constants::MAX_MAG + 1,
                 [](uint64_t i) { return i == 0; })) {
             return false;
         }
 
         // (1) normalize the counts
-        auto norm_counts = normalize_counts(table);
+        auto norm_counts = normalize_counts(&table);
 
         // (2) create the encoding model
-        size_t model_size = sizeof(ans_packed_enc_model) + (table->max_value + 1) * sizeof(mag_enc_table_entry);
+        size_t model_size = sizeof(ans_packed_enc_model) + (table.max_value + 1) * sizeof(mag_enc_table_entry);
         std::vector<uint8_t> new_model(model_size);
-        auto model = reinterpret_cast<ans_packed_enc_model*>(new_model.data());
+        auto model_ptr = reinterpret_cast<ans_packed_enc_model*>(new_model.data());
+        auto& model = *model_ptr;
 
         // (2a) fill the tables
         uint64_t cumsum = 0;
-        for (size_t i = 0; i < ans_packed_constants::MAX_MAG; i++) {
+        for (size_t i = 0; i <= ans_packed_constants::MAX_MAG; i++) {
             if (norm_counts->counts[i] == 0)
                 continue;
             auto min_val = ans_min_val_in_mag(i);
             auto max_val = ans_max_val_in_mag(i, norm_counts->max_value);
             for (size_t j = min_val; j <= max_val; j++) {
-                model->table[j].freq = norm_counts->counts[i];
-                model->table[j].base = cumsum;
-                cumsum += model->table[j].freq;
+                model.table[j].freq = norm_counts->counts[i];
+                model.table[j].base = cumsum;
+                cumsum += model.table[j].freq;
             }
         }
 
-        model->M = cumsum;
-        model->norm_lower_bound = ans_packed_constants::OUTPUT_BASE * model->M;
+        model.M = cumsum;
+        model.norm_lower_bound = ans_packed_constants::OUTPUT_BASE * model.M;
         for (size_t j = 1; j < (norm_counts->max_value + 1); j++) {
-            model->table[j].SUB = ((model->norm_lower_bound / model->M) * ans_packed_constants::OUTPUT_BASE)
-                * model->table[j].freq;
+            model.table[j].SUB = ((model.norm_lower_bound / model.M) * ans_packed_constants::OUTPUT_BASE)
+                * model.table[j].freq;
         }
-        model->mask_M = model->M - 1;
-        model->log2_M = log2(model->M);
-        model->max_value = norm_counts->max_value;
+        model.mask_M = model.M - 1;
+        model.log2_M = log2(model.M);
+        model.max_value = norm_counts->max_value;
 
         enc_models.insert(enc_models.end(), new_model.begin(), new_model.end());
         delete norm_counts;
@@ -232,7 +246,8 @@ struct ans_packed_model {
 
     static std::vector<uint8_t> create_enc_model_from_counts(const std::vector<uint8_t>& cntsu8)
     {
-        auto counts = reinterpret_cast<const ans_packed_counts*>(cntsu8.data());
+        auto counts_ptr = reinterpret_cast<const ans_packed_counts*>(cntsu8.data());
+        const ans_packed_counts& counts = *counts_ptr;
         size_t pointers_to_models = ans_packed_constants::NUM_MAGS * sizeof(uint64_t);
         std::vector<uint8_t> enc_models(pointers_to_models, 0);
 
@@ -249,25 +264,26 @@ struct ans_packed_model {
         return enc_models;
     }
 
-    static void create_dec_model(std::vector<uint8_t>& dec_models, const ans_packed_enc_model* enc_model)
+    static void create_dec_model(std::vector<uint8_t>& dec_models, const ans_packed_enc_model& enc_model)
     {
         // (1) determine model size
-        size_t model_size = sizeof(ans_packed_dec_model) + (enc_model->M) * sizeof(mag_dec_table_entry);
+        size_t model_size = sizeof(ans_packed_dec_model) + (enc_model.M) * sizeof(mag_dec_table_entry);
         std::vector<uint8_t> new_model(model_size);
-        auto model = reinterpret_cast<ans_packed_dec_model*>(new_model.data());
+        auto model_ptr = reinterpret_cast<ans_packed_dec_model*>(new_model.data());
+        auto& model = *model_ptr;
 
         // (2) create csum table for decoding
-        model->M = enc_model->M;
-        model->mask_M = model->M - 1;
-        model->log2_M = log2(model->M);
-        model->norm_lower_bound = model->norm_lower_bound;
+        model.M = enc_model.M;
+        model.mask_M = model.M - 1;
+        model.log2_M = log2(model.M);
+        model.norm_lower_bound = enc_model.norm_lower_bound;
         size_t base = 0;
-        for (size_t j = 1; j < enc_model->M; j++) {
-            auto cur_freq = enc_model->table[j].freq;
+        for (size_t j = 1; j < enc_model.max_value; j++) {
+            auto cur_freq = enc_model.table[j].freq;
             for (size_t k = 0; k < cur_freq; k++) {
-                model->table[base + k].sym = j;
-                model->table[base + k].freq = cur_freq;
-                model->table[base + k].offset = k;
+                model.table[base + k].sym = j;
+                model.table[base + k].freq = cur_freq;
+                model.table[base + k].offset = k;
             }
             base += cur_freq;
         }
@@ -286,7 +302,8 @@ struct ans_packed_model {
             if (encs_models[i] != 0) {
                 *model_offset_u64_ptr = dec_model_u8.size();
                 size_t model_offset = encs_models[i];
-                auto enc_model = reinterpret_cast<const ans_packed_enc_model*>(enc_models_u8.data() + model_offset);
+                auto enc_model_ptr = reinterpret_cast<const ans_packed_enc_model*>(enc_models_u8.data() + model_offset);
+                const ans_packed_enc_model& enc_model = *enc_model_ptr;
                 create_dec_model(dec_model_u8, enc_model);
             } else {
                 *model_offset_u64_ptr = 0;
@@ -299,7 +316,8 @@ struct ans_packed_model {
     static void model(std::vector<uint8_t>& cntsu8, uint32_t const* in, uint32_t /*sum_of_values*/, size_t n)
     {
         static uint8_t block_mags[block_size];
-        auto counts = reinterpret_cast<ans_packed_counts*>(cntsu8.data());
+        auto counts_ptr = reinterpret_cast<ans_packed_counts*>(cntsu8.data());
+        auto& counts = *counts_ptr;
         uint32_t max_value = 0;
         for (size_t i = 0; i < n; i++) {
             block_mags[i] = ans_packed_magnitude(in[i] + 1);
@@ -307,9 +325,9 @@ struct ans_packed_model {
         }
         uint8_t max_mag = ans_packed_magnitude(max_value);
         auto model_id = ans_packed_constants::MAG2SEL[max_mag];
-        counts[model_id]->max_value = std::max(max_value, counts[model_id]->max_value);
+        counts[model_id].max_value = std::max(max_value, counts[model_id].max_value);
         for (size_t i = 0; i < n; i++) {
-            counts[model_id]->counts[block_mags[i]]++;
+            counts[model_id].counts[block_mags[i]]++;
         }
     }
 
