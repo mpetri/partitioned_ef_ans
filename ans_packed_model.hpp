@@ -299,7 +299,7 @@ struct ans_packed_model {
     {
         auto enc_models = reinterpret_cast<const uint64_t*>(enc_models_u8.data());
         size_t pointers_to_models = ans_packed_constants::NUM_MAGS * sizeof(uint64_t);
-        std::vector<uint8_t> dec_model_u8(pointers_to_models, 0);
+        std::vector<uint8_t> dec_models_u8(pointers_to_models, 0);
 
         for (size_t i = 0; i < ans_packed_constants::NUM_MAGS; i++) {
             size_t dec_model_offset = dec_model_u8.size();
@@ -308,33 +308,32 @@ struct ans_packed_model {
                 std::cout << "create dec_model i=" << i << " enc_model_offset=" << enc_model_offset << std::endl;
                 auto enc_model_ptr = reinterpret_cast<const ans_packed_enc_model*>(enc_models_u8.data() + enc_model_offset);
                 const ans_packed_enc_model& enc_model = *enc_model_ptr;
-                create_dec_model(dec_model_u8, enc_model);
-                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_model_u8.data()) + i;
+                create_dec_model(dec_models_u8, enc_model);
+                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
                 *model_offset_u64_ptr = dec_model_offset;
             } else {
-                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_model_u8.data()) + i;
+                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
                 *model_offset_u64_ptr = 0;
             }
         }
 
-        return dec_model_u8;
+        return dec_models_u8;
     }
 
     static void model(std::vector<uint8_t>& cntsu8, uint32_t const* in, uint32_t /*sum_of_values*/, size_t n)
     {
-        static uint8_t block_mags[block_size];
         auto counts_ptr = reinterpret_cast<ans_packed_counts*>(cntsu8.data());
         auto& counts = *counts_ptr;
         uint32_t max_value = 0;
         for (size_t i = 0; i < n; i++) {
-            block_mags[i] = ans_packed_magnitude(in[i] + 1);
             max_value = std::max(max_value, in[i] + 1);
         }
         uint8_t max_mag = ans_packed_magnitude(max_value);
         auto model_id = ans_packed_constants::MAG2SEL[max_mag];
         counts[model_id].max_value = std::max(max_value, counts[model_id].max_value);
         for (size_t i = 0; i < n; i++) {
-            counts[model_id].counts[block_mags[i]]++;
+            uint8_t mag = ans_packed_magnitude(in[i] + 1);
+            counts[model_id].counts[mag]++;
         }
     }
 
