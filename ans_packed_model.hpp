@@ -253,12 +253,14 @@ struct ans_packed_model {
 
         for (size_t i = 0; i < ans_packed_constants::NUM_MAGS; i++) {
             // (1) store offset of model data in byte stream
-            auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(enc_models.data()) + i;
-            *model_offset_u64_ptr = enc_models.size();
+            size_t model_offset = enc_models.size();
             // (2) create the model
             bool empty_model = create_enc_model(enc_models, counts[i]);
+            auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(enc_models.data()) + i;
             if (empty_model)
                 *model_offset_u64_ptr = 0;
+            else
+                *model_offset_u64_ptr = model_offset;
         }
 
         return enc_models;
@@ -297,15 +299,15 @@ struct ans_packed_model {
         std::vector<uint8_t> dec_model_u8(pointers_to_models, 0);
 
         for (size_t i = 0; i < ans_packed_constants::NUM_MAGS; i++) {
-            auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_model_u8.data()) + i;
-
+            size_t model_offset = dec_model_u8.size();
             if (encs_models[i] != 0) {
-                *model_offset_u64_ptr = dec_model_u8.size();
-                size_t model_offset = encs_models[i];
                 auto enc_model_ptr = reinterpret_cast<const ans_packed_enc_model*>(enc_models_u8.data() + model_offset);
                 const ans_packed_enc_model& enc_model = *enc_model_ptr;
                 create_dec_model(dec_model_u8, enc_model);
+                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_model_u8.data()) + i;
+                *model_offset_u64_ptr = model_offset;
             } else {
+                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_model_u8.data()) + i;
                 *model_offset_u64_ptr = 0;
             }
         }
