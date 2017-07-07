@@ -299,13 +299,14 @@ struct ans_packed_model {
         std::vector<uint8_t> dec_model_u8(pointers_to_models, 0);
 
         for (size_t i = 0; i < ans_packed_constants::NUM_MAGS; i++) {
-            size_t model_offset = dec_model_u8.size();
+            size_t dec_model_offset = dec_model_u8.size();
             if (encs_models[i] != 0) {
-                auto enc_model_ptr = reinterpret_cast<const ans_packed_enc_model*>(enc_models_u8.data() + model_offset);
+                size_t enc_model_offset = encs_models[i];
+                auto enc_model_ptr = reinterpret_cast<const ans_packed_enc_model*>(enc_models_u8.data() + enc_model_offset);
                 const ans_packed_enc_model& enc_model = *enc_model_ptr;
                 create_dec_model(dec_model_u8, enc_model);
                 auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_model_u8.data()) + i;
-                *model_offset_u64_ptr = model_offset;
+                *model_offset_u64_ptr = dec_model_offset;
             } else {
                 auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_model_u8.data()) + i;
                 *model_offset_u64_ptr = 0;
