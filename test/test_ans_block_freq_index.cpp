@@ -57,7 +57,7 @@ void test_ans_block_freq_index()
                 MY_REQUIRE_EQUAL(plist.first[p], doc_enum.docid(),
                     "i = " << i << " p = " << p);
                 MY_REQUIRE_EQUAL(plist.second[p], doc_enum.freq(),
-                    "i = " << i << " p = " << p);
+                    "i = " << i << " n = " << plist.first.size() << " p = " << p << " p%128 = " << p % 128);
             }
             BOOST_REQUIRE_EQUAL(coll.num_docs(), doc_enum.docid());
         }
