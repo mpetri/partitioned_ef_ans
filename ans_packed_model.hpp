@@ -203,7 +203,7 @@ struct ans_packed_model {
         // (0) if all is 0 do nothing
         if (std::all_of(table.counts, table.counts + ans_packed_constants::MAX_MAG + 1,
                 [](uint64_t i) { return i == 0; })) {
-            return false;
+            return true;
         }
 
         // (1) normalize the counts
@@ -241,7 +241,7 @@ struct ans_packed_model {
 
         enc_models.insert(enc_models.end(), new_model.begin(), new_model.end());
         delete norm_counts;
-        return true;
+        return false;
     }
 
     static std::vector<uint8_t> create_enc_model_from_counts(const std::vector<uint8_t>& cntsu8)
