@@ -14,6 +14,84 @@ const uint32_t OUTPUT_BASE = 256;
 const uint8_t OUTPUT_BASE_LOG2 = 8;
 }
 
+inline uint8_t ans_packed_vb_size(uint64_t x)
+{
+    if (x < (1ULL << 7)) {
+        return 1;
+    } else if (x < (1ULL << 14)) {
+        return 2;
+    } else if (x < (1ULL << 21)) {
+        return 3;
+    } else if (x < (1ULL << 28)) {
+        return 4;
+    } else if (x < (1ULL << 35)) {
+        return 5;
+    } else if (x < (1ULL << 42)) {
+        return 6;
+    } else if (x < (1ULL << 49)) {
+        return 7;
+    } else if (x < (1ULL << 56)) {
+        return 8;
+    } else {
+        return 9;
+    }
+    return 9;
+}
+
+inline uint64_t ans_packed_vbyte_decode_u32(const uint8_t*& input)
+{
+    uint64_t x = 0;
+    uint64_t shift = 0;
+    while (true) {
+        uint8_t c = *input++;
+        x += (uint32_t(c & 127) << shift);
+        if (!(c & 128)) {
+            return x;
+        }
+        shift += 7;
+    }
+    return x;
+}
+
+template <uint32_t i>
+inline uint8_t ans_packed_extract7bits(const uint32_t val)
+{
+    uint8_t v = static_cast<uint8_t>((val >> (7 * i)) & ((1ULL << 7) - 1));
+    return v;
+}
+
+template <uint32_t i>
+inline uint8_t ans_packed_extract7bitsmaskless(const uint32_t val)
+{
+    uint8_t v = static_cast<uint8_t>((val >> (7 * i)));
+    return v;
+}
+
+inline void ans_packed_vbyte_encode_u32(uint8_t*& out, uint32_t x)
+{
+    if (x < (1ULL << 7)) {
+        *out++ = static_cast<uint8_t>(x & 127);
+    } else if (x < (1ULL << 14)) {
+        *out++ = ans_packed_extract7bits<0>(x) | 128;
+        *out++ = ans_packed_extract7bitsmaskless<1>(x) & 127;
+    } else if (x < (1ULL << 21)) {
+        *out++ = ans_packed_extract7bits<0>(x) | 128;
+        *out++ = ans_packed_extract7bits<1>(x) | 128;
+        *out++ = ans_packed_extract7bitsmaskless<2>(x) & 127;
+    } else if (x < (1ULL << 28)) {
+        *out++ = ans_packed_extract7bits<0>(x) | 128;
+        *out++ = ans_packed_extract7bits<1>(x) | 128;
+        *out++ = ans_packed_extract7bits<2>(x) | 128;
+        *out++ = ans_packed_extract7bitsmaskless<3>(x) & 127;
+    } else {
+        *out++ = ans_packed_extract7bits<0>(x) | 128;
+        *out++ = ans_packed_extract7bits<1>(x) | 128;
+        *out++ = ans_packed_extract7bits<2>(x) | 128;
+        *out++ = ans_packed_extract7bits<3>(x) | 128;
+        *out++ = ans_packed_extract7bitsmaskless<4>(x) & 127;
+    }
+}
+
 uint8_t ans_packed_magnitude(uint32_t x)
 {
     uint64_t y = x;
@@ -361,9 +439,10 @@ struct ans_packed_model {
 
     static void flush_state(uint32_t state, uint8_t*& out)
     {
-        out -= 4;
-        uint32_t* out32 = reinterpret_cast<uint32_t*>(out);
-        *out32 = state;
+        uint8_t vb_size = ans_packed_vb_size(state);
+        out -= vb_size;
+        auto outvb = out;
+        ans_packed_vbyte_encode_u32(outvb, state);
     }
 
     static void encode(uint32_t const* in, uint32_t /* sum_of_values */,
@@ -390,7 +469,7 @@ struct ans_packed_model {
             uint32_t num = in[n - k - 1] + 1;
             state = encode_num(cur_model, state, num, out_ptr);
         }
-        flush_state(state, out_ptr);
+        flush_state(state - cur_model->norm_lower_bound, out_ptr);
 
         // (3) copy to real out buf
         size_t enc_size = out_start - out_ptr;
@@ -411,11 +490,9 @@ struct ans_packed_model {
         return num;
     }
 
-    static uint32_t init_decoder_state(const uint8_t*& in)
+    static uint32_t init_decoder_state(const ans_packed_dec_model* model, const uint8_t*& in)
     {
-        const uint32_t* in32 = reinterpret_cast<const uint32_t*>(in);
-        in += 4;
-        return *in32;
+        return ans_packed_vbyte_decode_u32(in) + model->norm_lower_bound;
     }
 
     static uint8_t const*
@@ -435,7 +512,7 @@ struct ans_packed_model {
         size_t model_offset = model_ptrs[model_id];
         auto cur_model = reinterpret_cast<const ans_packed_dec_model*>(dec_model_u8 + model_offset);
 
-        uint32_t state = init_decoder_state(in);
+        uint32_t state = init_decoder_state(cur_model, in);
         for (size_t k = 0; k < n; k++) {
             uint32_t dec_num = decode_num(cur_model, state, in);
             *out++ = dec_num - 1; // substract one as OT has 0s and our smallest num is 1
