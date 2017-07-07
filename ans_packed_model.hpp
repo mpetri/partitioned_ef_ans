@@ -194,7 +194,7 @@ struct ans_packed_model {
 
     static ans_packed_mag_table* normalize_counts(const ans_packed_mag_table* table)
     {
-        // print_mag_table(table, "initial_freqs");
+        print_mag_table(table, "initial_freqs");
         ans_packed_mag_table* nfreqs = new ans_packed_mag_table;
         nfreqs->max_value = table->max_value;
         uint64_t initial_sum = 0;
@@ -261,7 +261,7 @@ struct ans_packed_model {
         if (excess != 0) {
             nfreqs->counts[0] += excess;
         }
-        // print_mag_table(nfreqs, "final_phase");
+        print_mag_table(nfreqs, "final_phase");
 
         M = 0;
         for (size_t i = 0; i <= max_mag; i++) {
@@ -341,6 +341,7 @@ struct ans_packed_model {
                 *model_offset_u64_ptr = model_offset;
             }
         }
+        std::cout << "create enc models done" << std::endl;
         return enc_models;
     }
 
@@ -390,6 +391,7 @@ struct ans_packed_model {
                 *model_offset_u64_ptr = 0;
             }
         }
+        std::cout << "create dec models done" << std::endl;
         return dec_models_u8;
     }
 

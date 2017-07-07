@@ -155,15 +155,16 @@ void dump_index_specific_stats(quasi_succinct::opt_index const& coll,
 }
 
 struct progress_logger {
-    progress_logger()
-        : sequences(0)
+    progress_logger(std::string msg_type)
+        : msg(msg_type)
+        , sequences(0)
         , postings(0)
     {
     }
 
     void log()
     {
-        logger() << "Processed " << sequences << " sequences, "
+        logger() << msg << " " << sequences << " sequences, "
                  << postings << " postings" << std::endl;
     }
 
@@ -176,6 +177,7 @@ struct progress_logger {
         }
     }
 
+    std::string msg;
     size_t sequences, postings;
 };
 
@@ -187,14 +189,14 @@ void create_collection(InputCollection const& input,
 {
     using namespace quasi_succinct;
 
-    logger() << "Processing " << input.num_docs() << " documents" << std::endl;
+    logger() << "Modelling " << input.num_docs() << " documents" << std::endl;
     double tick = get_time_usecs();
     double user_tick = get_user_time_usecs();
 
     typename CollectionType::builder builder(input.num_docs(), params);
 
     {
-        progress_logger mplog;
+        progress_logger mplog("Modelling");
         for (auto const& plist : input) {
             uint64_t freqs_sum = std::accumulate(plist.freqs.begin(),
                 plist.freqs.end(), uint64_t(0));
@@ -207,7 +209,7 @@ void create_collection(InputCollection const& input,
         mplog.log();
     }
 
-    progress_logger plog;
+    progress_logger plog("Coding");
     for (auto const& plist : input) {
         uint64_t freqs_sum = std::accumulate(plist.freqs.begin(),
             plist.freqs.end(), uint64_t(0));

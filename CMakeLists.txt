@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 project(INDEX_PARTITIONING)
 
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Debug")
+  set(CMAKE_BUILD_TYPE "Release")
 endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
