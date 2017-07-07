@@ -304,7 +304,7 @@ struct ans_packed_model {
             size_t dec_model_offset = dec_model_u8.size();
             if (encs_models[i] != 0) {
                 size_t enc_model_offset = enc_models[i];
-                std::cout << "create dec_model i=" << i << " enc_model_offset=" << model_offset << std::endl;
+                std::cout << "create dec_model i=" << i << " enc_model_offset=" << enc_model_offset << std::endl;
                 auto enc_model_ptr = reinterpret_cast<const ans_packed_enc_model*>(enc_models_u8.data() + enc_model_offset);
                 const ans_packed_enc_model& enc_model = *enc_model_ptr;
                 create_dec_model(dec_model_u8, enc_model);
