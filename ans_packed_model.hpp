@@ -38,7 +38,7 @@ inline uint8_t ans_packed_vb_size(uint64_t x)
     return 9;
 }
 
-inline uint64_t ans_packed_vbyte_decode_u32(const uint8_t*& input)
+inline uint64_t ans_packed_vbyte_decode_u64(const uint8_t*& input)
 {
     uint64_t x = 0;
     uint64_t shift = 0;
@@ -54,20 +54,20 @@ inline uint64_t ans_packed_vbyte_decode_u32(const uint8_t*& input)
 }
 
 template <uint32_t i>
-inline uint8_t ans_packed_extract7bits(const uint32_t val)
+inline uint8_t ans_packed_extract7bits(const uint64_t val)
 {
     uint8_t v = static_cast<uint8_t>((val >> (7 * i)) & ((1ULL << 7) - 1));
     return v;
 }
 
 template <uint32_t i>
-inline uint8_t ans_packed_extract7bitsmaskless(const uint32_t val)
+inline uint8_t ans_packed_extract7bitsmaskless(const uint64_t val)
 {
     uint8_t v = static_cast<uint8_t>((val >> (7 * i)));
     return v;
 }
 
-inline void ans_packed_vbyte_encode_u32(uint8_t*& out, uint32_t x)
+inline void ans_packed_vbyte_encode_u64(uint8_t*& out, uint64_t x)
 {
     if (x < (1ULL << 7)) {
         *out++ = static_cast<uint8_t>(x & 127);
@@ -83,12 +83,44 @@ inline void ans_packed_vbyte_encode_u32(uint8_t*& out, uint32_t x)
         *out++ = ans_packed_extract7bits<1>(x) | 128;
         *out++ = ans_packed_extract7bits<2>(x) | 128;
         *out++ = ans_packed_extract7bitsmaskless<3>(x) & 127;
-    } else {
+    } else if (x < (1ULL << 35)) {
         *out++ = ans_packed_extract7bits<0>(x) | 128;
         *out++ = ans_packed_extract7bits<1>(x) | 128;
         *out++ = ans_packed_extract7bits<2>(x) | 128;
         *out++ = ans_packed_extract7bits<3>(x) | 128;
         *out++ = ans_packed_extract7bitsmaskless<4>(x) & 127;
+    } else if (x < (1ULL << 42)) {
+        *out++ = ans_packed_extract7bits<0>(x) | 128;
+        *out++ = ans_packed_extract7bits<1>(x) | 128;
+        *out++ = ans_packed_extract7bits<2>(x) | 128;
+        *out++ = ans_packed_extract7bits<3>(x) | 128;
+        *out++ = ans_packed_extract7bits<4>(x) | 128;
+        *out++ = ans_packed_extract7bitsmaskless<5>(x) & 127;
+    } else if (x < (1ULL << 49)) {
+        *out++ = ans_packed_extract7bits<0>(x) | 128;
+        *out++ = ans_packed_extract7bits<1>(x) | 128;
+        *out++ = ans_packed_extract7bits<2>(x) | 128;
+        *out++ = ans_packed_extract7bits<3>(x) | 128;
+        *out++ = ans_packed_extract7bits<4>(x) | 128;
+        *out++ = ans_packed_extract7bits<5>(x) | 128;
+        *out++ = ans_packed_extract7bitsmaskless<6>(x) & 127;
+    } else if (x < (1ULL << 56)) {
+        *out++ = ans_packed_extract7bits<0>(x) | 128;
+        *out++ = ans_packed_extract7bits<1>(x) | 128;
+        *out++ = ans_packed_extract7bits<2>(x) | 128;
+        *out++ = ans_packed_extract7bits<3>(x) | 128;
+        *out++ = ans_packed_extract7bits<4>(x) | 128;
+        *out++ = ans_packed_extract7bits<5>(x) | 128;
+        *out++ = ans_packed_extract7bitsmaskless<6>(x) & 127;
+    } else {
+        *out++ = ans_packed_extract7bits<0>(x) | 128;
+        *out++ = ans_packed_extract7bits<1>(x) | 128;
+        *out++ = ans_packed_extract7bits<2>(x) | 128;
+        *out++ = ans_packed_extract7bits<3>(x) | 128;
+        *out++ = ans_packed_extract7bits<4>(x) | 128;
+        *out++ = ans_packed_extract7bits<5>(x) | 128;
+        *out++ = ans_packed_extract7bits<6>(x) | 128;
+        *out++ = ans_packed_extract7bitsmaskless<7>(x) & 127;
     }
 }
 
@@ -138,22 +170,22 @@ bool is_power_of_two(uint64_t x) { return ((x != 0) && !(x & (x - 1))); }
 
 struct mag_enc_table_entry {
     uint32_t freq;
-    uint32_t base;
-    uint32_t SUB;
+    uint64_t base;
+    uint64_t SUB;
 };
 
 struct mag_dec_table_entry {
     uint32_t freq;
-    uint32_t offset;
+    uint64_t offset;
     uint32_t sym;
 };
 
 struct ans_packed_enc_model {
-    uint32_t M = 0; // frame size
+    uint64_t M = 0; // frame size
     uint8_t log2_M = 0;
-    uint32_t mask_M = 0;
-    uint32_t norm_lower_bound = 0;
-    uint32_t max_value = 0;
+    uint64_t mask_M = 0;
+    uint64_t norm_lower_bound = 0;
+    uint64_t max_value = 0;
     mag_enc_table_entry table[0];
 };
 
@@ -422,11 +454,11 @@ struct ans_packed_model {
         return ans_packed_constants::MAG2SEL[max_mag];
     }
 
-    static uint32_t encode_num(const ans_packed_enc_model* model, uint32_t state, uint32_t num, uint8_t*& out)
+    static uint64_t encode_num(const ans_packed_enc_model* model, uint64_t state, uint32_t num, uint8_t*& out)
     {
         const auto& entry = model->table[num];
         uint32_t f = entry.freq;
-        uint32_t b = entry.base;
+        uint64_t b = entry.base;
         // (1) normalize
         while (state >= entry.SUB) {
             --out;
@@ -435,16 +467,16 @@ struct ans_packed_model {
         }
 
         // (2) transform state
-        uint32_t next = ((state / f) * model->M) + (state % f) + b;
+        uint64_t next = ((state / f) * model->M) + (state % f) + b;
         return next;
     }
 
-    static void flush_state(uint32_t state, uint8_t*& out)
+    static void flush_state(uint64_t state, uint8_t*& out)
     {
         uint8_t vb_size = ans_packed_vb_size(state);
         out -= vb_size;
         auto outvb = out;
-        ans_packed_vbyte_encode_u32(outvb, state);
+        ans_packed_vbyte_encode_u64(outvb, state);
     }
 
     static void encode(uint32_t const* in, uint32_t /* sum_of_values */,
@@ -464,7 +496,7 @@ struct ans_packed_model {
         auto model_ptrs = reinterpret_cast<const uint64_t*>(enc_model_u8.data());
         size_t model_offset = model_ptrs[model_id];
         auto cur_model = reinterpret_cast<const ans_packed_enc_model*>(enc_model_u8.data() + model_offset);
-        uint32_t state = cur_model->norm_lower_bound;
+        uint64_t state = cur_model->norm_lower_bound;
         auto out_ptr = tmp_out_buf.data() + tmp_out_buf.size() - 1;
         auto out_start = out_ptr;
         for (size_t k = 0; k < n; k++) {
@@ -478,7 +510,7 @@ struct ans_packed_model {
         out.insert(out.end(), out_ptr, out_ptr + enc_size);
     }
 
-    static uint32_t decode_num(const ans_packed_dec_model* model, uint32_t& state, const uint8_t*& in)
+    static uint32_t decode_num(const ans_packed_dec_model* model, uint64_t& state, const uint8_t*& in)
     {
         uint32_t state_mod_M = state & model->mask_M;
         const auto& entry = model->table[state_mod_M];
@@ -487,14 +519,14 @@ struct ans_packed_model {
         state = f * (state >> model->log2_M) + entry.offset;
         while (state < model->norm_lower_bound) {
             uint8_t new_byte = *in++;
-            state = (state << ans_packed_constants::OUTPUT_BASE_LOG2) | uint32_t(new_byte);
+            state = (state << ans_packed_constants::OUTPUT_BASE_LOG2) | uint64_t(new_byte);
         }
         return num;
     }
 
-    static uint32_t init_decoder_state(const ans_packed_dec_model* model, const uint8_t*& in)
+    static uint64_t init_decoder_state(const ans_packed_dec_model* model, const uint8_t*& in)
     {
-        return ans_packed_vbyte_decode_u32(in) + model->norm_lower_bound;
+        return ans_packed_vbyte_decode_u64(in) + model->norm_lower_bound;
     }
 
     static uint8_t const*
@@ -514,7 +546,7 @@ struct ans_packed_model {
         size_t model_offset = model_ptrs[model_id];
         auto cur_model = reinterpret_cast<const ans_packed_dec_model*>(dec_model_u8 + model_offset);
 
-        uint32_t state = init_decoder_state(cur_model, in);
+        uint64_t state = init_decoder_state(cur_model, in);
         for (size_t k = 0; k < n; k++) {
             uint32_t dec_num = decode_num(cur_model, state, in);
             *out++ = dec_num - 1; // substract one as OT has 0s and our smallest num is 1
