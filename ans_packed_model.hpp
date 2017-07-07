@@ -265,7 +265,7 @@ struct ans_packed_model {
                 std::cout << "create enc_model i=" << i << " offset=" << model_offset << std::endl;
             }
         }
-
+        std::cout << "DONE CREATE ENC" << std::endl;
         return enc_models;
     }
 
@@ -316,7 +316,7 @@ struct ans_packed_model {
                 *model_offset_u64_ptr = 0;
             }
         }
-
+        std::cout << "DONE CREATE DEC" << std::endl;
         return dec_models_u8;
     }
 
@@ -339,10 +339,11 @@ struct ans_packed_model {
 
     static uint8_t pick_model(uint32_t const* in, size_t n)
     {
-        uint8_t max_mag = 0;
+        uint32_t max_val = 0;
         for (size_t i = 0; i < n; i++) {
-            max_mag = std::max(max_mag, ans_packed_magnitude(in[i] + 1));
+            max_val = std::max(max_val, in[i] + 1);
         }
+        uint8_t max_mag = ans_packed_magnitude(max_val);
         return ans_packed_constants::MAG2SEL[max_mag];
     }
 
@@ -390,8 +391,8 @@ struct ans_packed_model {
         uint32_t state = cur_model->norm_lower_bound;
         auto out_ptr = tmp_out_buf.data() + tmp_out_buf.size() - 1;
         auto out_start = out_ptr;
-        for (size_t k = 0; k < block_size; k++) {
-            uint32_t num = in[block_size - k - 1] + 1;
+        for (size_t k = 0; k < n; k++) {
+            uint32_t num = in[n - k - 1] + 1;
             state = encode_num(cur_model, state, num, out_ptr);
         }
         flush_state(state, out_ptr);
@@ -441,7 +442,7 @@ struct ans_packed_model {
         auto cur_model = reinterpret_cast<const ans_packed_dec_model*>(dec_model_u8 + model_offset);
 
         uint32_t state = init_decoder_state(in);
-        for (size_t k = 0; k < block_size; k++) {
+        for (size_t k = 0; k < n; k++) {
             *out++ = decode_num(cur_model, state, in) - 1; // substract one as OT has 0s and our smallest num is 1
         }
 
