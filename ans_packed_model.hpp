@@ -257,9 +257,10 @@ struct ans_packed_model {
             // (2) create the model
             bool empty_model = create_enc_model(enc_models, counts[i]);
             auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(enc_models.data()) + i;
-            if (empty_model)
+            if (empty_model) {
                 *model_offset_u64_ptr = 0;
-            else {
+                std::cout << "EMPTY MODEL enc_model i=" << i << " offset=" << model_offset << std::endl;
+            } else {
                 *model_offset_u64_ptr = model_offset;
                 std::cout << "create enc_model i=" << i << " offset=" << model_offset << std::endl;
             }
