@@ -302,7 +302,7 @@ struct ans_packed_model {
 
         for (size_t i = 0; i < ans_packed_constants::NUM_MAGS; i++) {
             size_t dec_model_offset = dec_model_u8.size();
-            if (encs_models[i] != 0) {
+            if (enc_models[i] != 0) {
                 size_t enc_model_offset = enc_models[i];
                 std::cout << "create dec_model i=" << i << " enc_model_offset=" << enc_model_offset << std::endl;
                 auto enc_model_ptr = reinterpret_cast<const ans_packed_enc_model*>(enc_models_u8.data() + enc_model_offset);
