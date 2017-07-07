@@ -10,8 +10,7 @@ template <typename t_ansmodel>
 struct ans_block_posting_list {
 
     template <typename DocsIterator, typename FreqsIterator>
-    static void model(std::vector<uint8_t>& doc_model, std::vector<uint8_t>& freq_model,
-        std::vector<uint8_t>& last_doc_model, std::vector<uint8_t>& last_freq_model, uint32_t n,
+    static void model(std::vector<uint8_t>& doc_model, std::vector<uint8_t>& freq_model, uint32_t n,
         DocsIterator docs_begin, FreqsIterator freqs_begin)
     {
         uint64_t block_size = t_ansmodel::block_size;
@@ -35,14 +34,9 @@ struct ans_block_posting_list {
                 freqs_buf[i] = *freqs_it++ - 1;
             }
 
-            if (n >= 100000) {
-                t_ansmodel::model(doc_model, docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size);
-                t_ansmodel::model(freq_model, freqs_buf.data(), uint32_t(-1), cur_block_size);
-            }
-            if (n <= 1000) {
-                t_ansmodel::model(last_doc_model, docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size);
-                t_ansmodel::model(last_freq_model, freqs_buf.data(), uint32_t(-1), cur_block_size);
-            }
+            t_ansmodel::model(doc_model, docs_buf.data(), last_doc - block_base - (cur_block_size - 1), cur_block_size);
+            t_ansmodel::model(freq_model, freqs_buf.data(), uint32_t(-1), cur_block_size);
+
             block_base = last_doc + 1;
         }
     }

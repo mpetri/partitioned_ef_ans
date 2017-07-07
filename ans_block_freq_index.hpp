@@ -6,7 +6,7 @@
 #include "ans_block_posting_list.hpp"
 #include "compact_elias_fano.hpp"
 
-#include "ans_models.hpp"
+#include "ans_packed_model.hpp"
 
 namespace quasi_succinct {
 
@@ -27,15 +27,13 @@ public:
             m_endpoints.push_back(0);
             m_doc_counts = t_ansmodel::create_empty_counts();
             m_freq_counts = t_ansmodel::create_empty_counts();
-            m_last_doc_counts = t_ansmodel::create_empty_counts();
-            m_last_freq_counts = t_ansmodel::create_empty_counts();
         }
 
         template <typename DocsIterator, typename FreqsIterator>
         void model_posting_list(uint64_t n, DocsIterator docs_begin,
             FreqsIterator freqs_begin, uint64_t /*occurrences*/)
         {
-            ans_block_posting_list<t_ansmodel>::model(m_doc_counts, m_freq_counts, m_last_doc_counts, m_last_freq_counts, n, docs_begin, freqs_begin);
+            ans_block_posting_list<t_ansmodel>::model(m_doc_counts, m_freq_counts, n, docs_begin, freqs_begin);
         }
 
         template <typename DocsIterator, typename FreqsIterator>
@@ -52,15 +50,6 @@ public:
         {
             m_doc_enc_model = t_ansmodel::create_enc_model_from_counts(m_doc_counts);
             m_freq_enc_model = t_ansmodel::create_enc_model_from_counts(m_freq_counts);
-
-            auto last_doc_enc_model = t_ansmodel::create_enc_model_from_counts(m_last_doc_counts);
-            auto last_freq_enc_model = t_ansmodel::create_enc_model_from_counts(m_last_freq_counts);
-
-            t_ansmodel::print_enc_model(m_doc_enc_model, "geq_100k;doc");
-            t_ansmodel::print_enc_model(last_doc_enc_model, "leq_1k;doc");
-
-            t_ansmodel::print_enc_model(m_freq_enc_model, "geq_100k;freq");
-            t_ansmodel::print_enc_model(last_freq_enc_model, "leq_1k;freq");
 
             m_doc_dec_model = t_ansmodel::create_dec_model(m_doc_enc_model);
             m_freq_dec_model = t_ansmodel::create_dec_model(m_freq_enc_model);
@@ -89,8 +78,6 @@ public:
         std::vector<uint8_t> m_lists;
         std::vector<uint8_t> m_doc_counts;
         std::vector<uint8_t> m_freq_counts;
-        std::vector<uint8_t> m_last_doc_counts;
-        std::vector<uint8_t> m_last_freq_counts;
         std::vector<uint8_t> m_doc_enc_model;
         std::vector<uint8_t> m_freq_enc_model;
         std::vector<uint8_t> m_doc_dec_model;
@@ -126,12 +113,22 @@ public:
         std::swap(m_size, other.m_size);
         m_endpoints.swap(other.m_endpoints);
         m_lists.swap(other.m_lists);
+        m_doc_dec_model.swap(other.m_doc_dec_model);
+        m_freq_dec_model.swap(other.m_freq_dec_model);
     }
 
     template <typename Visitor>
     void map(Visitor& visit)
     {
-        visit(m_params, "m_params")(m_size, "m_size")(m_num_docs, "m_num_docs")(m_endpoints, "m_endpoints")(m_lists, "m_lists")(m_doc_dec_model, "m_doc_dec_model")(m_freq_dec_model, "m_freq_dec_model");
+        // clang-format off
+        visit(m_params, "m_params")
+            (m_size, "m_size")
+            (m_num_docs, "m_num_docs")
+            (m_endpoints, "m_endpoints")
+            (m_lists, "m_lists")
+            (m_doc_dec_model, "m_doc_dec_model")
+            (m_freq_dec_model, "m_freq_dec_model");
+        // clang-format on
     }
 
 private:
