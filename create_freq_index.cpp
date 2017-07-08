@@ -74,21 +74,6 @@ void get_size_stats(quasi_succinct::freq_index<DocsSequence, FreqsSequence>& col
     }
 }
 
-template <typename DocsSequence, typename FreqsSequence>
-void get_size_stats2(quasi_succinct::freq_index<DocsSequence, FreqsSequence>& coll,
-    uint64_t& docs_size, uint64_t& freqs_size)
-{
-    auto size_tree = succinct::mapper::size_tree_of(coll);
-    size_tree->dump();
-    for (auto const& node : size_tree->children) {
-        if (node->name == "m_docs_sequences") {
-            docs_size = node->size;
-        } else if (node->name == "m_freqs_sequences") {
-            freqs_size = node->size;
-        }
-    }
-}
-
 template <typename BlockCodec>
 void get_size_stats(quasi_succinct::block_freq_index<BlockCodec>& coll,
     uint64_t& docs_size, uint64_t& freqs_size)
@@ -115,44 +100,22 @@ void get_size_stats(quasi_succinct::ans_block_freq_index<t_ans_model>& coll,
         freqs_size += coll[i].stats_freqs_size();
     }
     docs_size = total_size - freqs_size;
-}
 
-template <typename BlockCodec>
-void get_size_stats2(quasi_succinct::block_freq_index<BlockCodec>& coll,
-    uint64_t& docs_size, uint64_t& freqs_size)
-{
-    auto size_tree = succinct::mapper::size_tree_of(coll);
-    size_tree->dump();
-    uint64_t total_size = size_tree->size;
-    for (auto const& node : size_tree->children) {
-        if (node->name == "m_lists") {
-            total_size = node->size;
-        }
-    }
-    freqs_size = 0;
-    for (size_t i = 0; i < coll.size(); ++i) {
-        freqs_size += coll[i].stats_freqs_size();
-    }
-    docs_size = total_size - freqs_size;
+    print_size_stats(coll);
 }
 
 template <typename t_ans_model>
-void get_size_stats2(quasi_succinct::ans_block_freq_index<t_ans_model>& coll,
-    uint64_t& docs_size, uint64_t& freqs_size)
+void print_size_stats(quasi_succinct::ans_block_freq_index<t_ans_model>& coll)
 {
-    auto size_tree = succinct::mapper::size_tree_of(coll);
-    size_tree->dump();
-    uint64_t total_size = size_tree->size;
-    for (auto const& node : size_tree->children) {
-        if (node->name == "m_lists") {
-            total_size = node->size;
-        }
-    }
-    freqs_size = 0;
+    size_t freqs_size = 0;
+    size_t docs_size = 0;
+    size_t freqs_nonfull_size = 0;
+    size_t docs_nonfull_size = 0;
+    block_size_stats stats;
     for (size_t i = 0; i < coll.size(); ++i) {
-        freqs_size += coll[i].stats_freqs_size();
+        stats += coll[i].stats_size();
     }
-    docs_size = total_size - freqs_size;
+    std::cout << stats;
 }
 
 template <typename Collection>
@@ -169,15 +132,6 @@ void dump_stats(Collection& coll,
     logger() << "Documents: " << docs_size << " bytes, "
              << bits_per_doc << " bits per element" << std::endl;
     logger() << "Frequencies: " << freqs_size << " bytes, "
-             << bits_per_freq << " bits per element" << std::endl;
-
-    get_size_stats2(coll, docs_size, freqs_size);
-
-    bits_per_doc = docs_size * 8.0 / postings;
-    bits_per_freq = freqs_size * 8.0 / postings;
-    logger() << "[ONLY_LISTS] Documents: " << docs_size << " bytes, "
-             << bits_per_doc << " bits per element" << std::endl;
-    logger() << "[ONLY_LISTS] Frequencies: " << freqs_size << " bytes, "
              << bits_per_freq << " bits per element" << std::endl;
 
     quasi_succinct::stats_line()("type", type)("docs_size", docs_size)("freqs_size", freqs_size)("bits_per_doc", bits_per_doc)("bits_per_freq", bits_per_freq);
