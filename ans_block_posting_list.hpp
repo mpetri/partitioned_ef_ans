@@ -285,6 +285,7 @@ struct ans_block_posting_list {
 
                 size_t doc_bytes = freq_ptr - doc_ptr;
                 size_t freq_bytes = end_ptr - freq_ptr;
+                doc_ptr = end_ptr;
 
                 bss.total_doc_bytes += doc_bytes;
                 bss.total_freq_bytes += freq_bytes;
