@@ -6,6 +6,88 @@
 
 namespace quasi_succinct {
 
+struct block_size_stats {
+    block_size_stats()
+    {
+        total_doc_bytes = 0;
+        total_freq_bytes = 0;
+        full_doc_bytes = 0;
+        full_freq_bytes = 0;
+        small_list_doc_bytes = 0;
+        small_list_freq_bytes = 0;
+        last_nonfull_doc_bytes = 0;
+        last_nonfull_freq_bytes = 0;
+        total_postings = 0;
+        small_list_postings = 0;
+        last_nonfull_postings = 0;
+        full_block_postings = 0;
+    }
+
+    uint64_t total_doc_bytes;
+    uint64_t total_freq_bytes;
+    uint64_t full_doc_bytes;
+    uint64_t full_freq_bytes;
+    uint64_t small_list_doc_bytes;
+    uint64_t small_list_freq_bytes;
+    uint64_t last_nonfull_doc_bytes;
+    uint64_t last_nonfull_freq_bytes;
+    uint64_t total_postings;
+    uint64_t small_list_postings;
+    uint64_t last_nonfull_postings;
+    uint64_t full_block_postings;
+
+    block_size_stats& operator+=(const block_size_stats& rhs)
+    {
+        this->total_postings += rhs.total_postings;
+        this->total_doc_bytes += rhs.total_doc_bytes;
+        this->total_freq_bytes += rhs.total_freq_bytes;
+        this->full_block_postings += rhs.full_block_postings;
+        this->full_doc_bytes += rhs.full_doc_bytes;
+        this->full_freq_bytes += rhs.full_freq_bytes;
+        this->small_list_postings += rhs.small_list_postings;
+        this->small_list_doc_bytes += rhs.small_list_doc_bytes;
+        this->small_list_freq_bytes += rhs.small_list_freq_bytes;
+        this->last_nonfull_doc_bytes += rhs.last_nonfull_doc_bytes;
+        this->last_nonfull_freq_bytes += rhs.last_nonfull_freq_bytes;
+        this->last_nonfull_postings += rhs.last_nonfull_postings;
+        return *this;
+    }
+};
+
+std::ostream& operator<<(std::ostream& o, const block_size_stats& stats)
+{
+    o << "total_postings = " << stats.total_postings << "\n";
+    o << "full_block_postings = " << stats.full_block_postings << "\n";
+    o << "small_list_postings = " << stats.small_list_postings << "\n";
+    o << "last_nonfull_postings = " << stats.last_nonfull_postings << "\n";
+    o << "full_block_percent = " << double(stats.full_block_postings) / double(stats.total_postings) * 100 << "\n";
+    o << "small_list_percent = " << double(stats.small_list_postings) / double(stats.total_postings) * 100 << "\n";
+    o << "last_nonfull_percent = " << double(stats.last_nonfull_postings) / double(stats.total_postings) * 100 << "\n";
+    o << "total_doc_bytes = " << stats.total_doc_bytes << "\n";
+    o << "total_freq_bytes = " << stats.total_freq_bytes << "\n";
+    o << "full_doc_bytes = " << stats.full_doc_bytes << "\n";
+    o << "full_freq_bytes = " << stats.full_freq_bytes << "\n";
+    o << "small_list_doc_bytes = " << stats.small_list_doc_bytes << "\n";
+    o << "small_list_freq_bytes = " << stats.small_list_freq_bytes << "\n";
+    o << "last_nonfull_doc_bytes = " << stats.last_nonfull_doc_bytes << "\n";
+    o << "last_nonfull_freq_bytes = " << stats.last_nonfull_freq_bytes << "\n";
+    o << "full_block_space_percent_docs = " << double(stats.full_doc_bytes) / double(stats.total_doc_bytes) * 100 << "\n";
+    o << "full_block_space_percent_freq = " << double(stats.full_freq_bytes) / double(stats.total_freq_bytes) * 100 << "\n";
+    o << "small_list_space_percent_docs = " << double(stats.small_list_doc_bytes) / double(stats.total_doc_bytes) * 100 << "\n";
+    o << "small_list_space_percent_freq = " << double(stats.small_list_freq_bytes) / double(stats.total_freq_bytes) * 100 << "\n";
+    o << "last_nonfull_space_percent_docs = " << double(stats.last_nonfull_doc_bytes) / double(stats.total_doc_bytes) * 100 << "\n";
+    o << "last_nonfull_space_percent_freq = " << double(stats.last_nonfull_freq_bytes) / double(stats.total_freq_bytes) * 100 << "\n";
+    o << "total_docs_BPI = " << double(stats.total_doc_bytes * 8) / double(stats.total_postings) << "\n";
+    o << "total_freqs_BPI = " << double(stats.total_freq_bytes * 8) / double(stats.total_postings) << "\n";
+    o << "full_block_docs_BPI = " << double(stats.full_doc_bytes * 8) / double(stats.full_block_postings) << "\n";
+    o << "full_block_freqs_BPI = " << double(stats.full_freq_bytes * 8) / double(stats.full_block_postings) << "\n";
+    o << "small_list_docs_BPI = " << double(stats.small_list_doc_bytes * 8) / double(stats.small_list_postings) << "\n";
+    o << "small_list_freqs_BPI = " << double(stats.small_list_freq_bytes * 8) / double(stats.small_list_postings) << "\n";
+    o << "last_nonfull_docs_BPI = " << double(stats.last_nonfull_doc_bytes * 8) / double(stats.last_nonfull_postings) << "\n";
+    o << "last_nonfull_freqs_BPI = " << double(stats.last_nonfull_freq_bytes * 8) / double(stats.last_nonfull_postings) << "\n";
+    return o << std::dec;
+}
+
 template <typename BlockCodec>
 struct block_posting_list {
 
@@ -174,6 +256,52 @@ struct block_posting_list {
         uint64_t size() const
         {
             return m_n;
+        }
+
+        block_size_stats size_stats() const
+        {
+            block_size_stats bss;
+
+            uint8_t const* doc_ptr = m_blocks_data;
+            static const uint64_t block_size = BlockCodec::block_size;
+            std::vector<uint32_t> buf(block_size);
+            for (size_t b = 0; b < m_blocks; ++b) {
+                uint32_t cur_block_size = ((b + 1) * block_size <= size())
+                    ? block_size
+                    : (size() % block_size);
+
+                uint32_t cur_base = (b ? block_max(b - 1) : uint32_t(-1)) + 1;
+                uint8_t const* freq_ptr = BlockCodec::decode(doc_ptr, buf.data(),
+                    block_max(b) - cur_base - (cur_block_size - 1),
+                    cur_block_size);
+                uint8_t const* end_ptr = BlockCodec::decode(freq_ptr, buf.data(),
+                    uint32_t(-1), cur_block_size);
+
+                size_t doc_bytes = freq_ptr - doc_ptr;
+                size_t freq_bytes = end_ptr - freq_ptr;
+                doc_ptr = end_ptr;
+
+                bss.total_doc_bytes += doc_bytes;
+                bss.total_freq_bytes += freq_bytes;
+                bss.total_postings += cur_block_size;
+                if (m_n < block_size) {
+                    bss.small_list_doc_bytes = doc_bytes;
+                    bss.small_list_freq_bytes = freq_bytes;
+                    bss.small_list_postings = m_n;
+                } else {
+                    if (cur_block_size < block_size) {
+                        bss.last_nonfull_doc_bytes = doc_bytes;
+                        bss.last_nonfull_freq_bytes = freq_bytes;
+                        bss.last_nonfull_postings = cur_block_size;
+                    } else {
+                        bss.full_doc_bytes += doc_bytes;
+                        bss.full_freq_bytes += freq_bytes;
+                        bss.full_block_postings += block_size;
+                    }
+                }
+            }
+
+            return bss;
         }
 
         uint64_t stats_freqs_size() const

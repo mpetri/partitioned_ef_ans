@@ -6,8 +6,8 @@
 
 namespace quasi_succinct {
 
-struct block_size_stats {
-    block_size_stats()
+struct ans_block_size_stats {
+    ans_block_size_stats()
     {
         total_doc_bytes = 0;
         total_freq_bytes = 0;
@@ -36,7 +36,7 @@ struct block_size_stats {
     uint64_t last_nonfull_postings;
     uint64_t full_block_postings;
 
-    block_size_stats& operator+=(const block_size_stats& rhs)
+    ans_block_size_stats& operator+=(const ans_block_size_stats& rhs)
     {
         this->total_postings += rhs.total_postings;
         this->total_doc_bytes += rhs.total_doc_bytes;
@@ -54,7 +54,7 @@ struct block_size_stats {
     }
 };
 
-std::ostream& operator<<(std::ostream& o, const block_size_stats& stats)
+std::ostream& operator<<(std::ostream& o, const ans_block_size_stats& stats)
 {
     o << "total_postings = " << stats.total_postings << "\n";
     o << "full_block_postings = " << stats.full_block_postings << "\n";
@@ -265,9 +265,9 @@ struct ans_block_posting_list {
             return m_n;
         }
 
-        block_size_stats size_stats() const
+        ans_block_size_stats size_stats() const
         {
-            block_size_stats bss;
+            ans_block_size_stats bss;
 
             uint8_t const* doc_ptr = m_blocks_data;
             static const uint64_t block_size = t_ansmodel::block_size;
