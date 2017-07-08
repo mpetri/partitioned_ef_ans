@@ -18,6 +18,7 @@ struct block_size_stats {
         last_nonfull_doc_bytes = 0;
         last_nonfull_freq_bytes = 0;
         total_postings = 0;
+        small_list_postings = 0;
         last_nonfull_postings = 0;
         full_block_postings = 0;
     }
