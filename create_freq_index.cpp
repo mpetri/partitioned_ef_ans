@@ -173,8 +173,8 @@ void dump_stats(Collection& coll,
 
     get_size_stats2(coll, docs_size, freqs_size);
 
-    double bits_per_doc = docs_size * 8.0 / postings;
-    double bits_per_freq = freqs_size * 8.0 / postings;
+    bits_per_doc = docs_size * 8.0 / postings;
+    bits_per_freq = freqs_size * 8.0 / postings;
     logger() << "[ONLY_LISTS] Documents: " << docs_size << " bytes, "
              << bits_per_doc << " bits per element" << std::endl;
     logger() << "[ONLY_LISTS] Frequencies: " << freqs_size << " bytes, "
