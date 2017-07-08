@@ -89,6 +89,20 @@ void get_size_stats(quasi_succinct::block_freq_index<BlockCodec>& coll,
 }
 
 template <typename t_ans_model>
+void print_size_stats(quasi_succinct::ans_block_freq_index<t_ans_model>& coll)
+{
+    size_t freqs_size = 0;
+    size_t docs_size = 0;
+    size_t freqs_nonfull_size = 0;
+    size_t docs_nonfull_size = 0;
+    quasi_succinct::block_size_stats stats;
+    for (size_t i = 0; i < coll.size(); ++i) {
+        stats += coll[i].stats_size();
+    }
+    std::cout << stats;
+}
+
+template <typename t_ans_model>
 void get_size_stats(quasi_succinct::ans_block_freq_index<t_ans_model>& coll,
     uint64_t& docs_size, uint64_t& freqs_size)
 {
@@ -102,20 +116,6 @@ void get_size_stats(quasi_succinct::ans_block_freq_index<t_ans_model>& coll,
     docs_size = total_size - freqs_size;
 
     print_size_stats(coll);
-}
-
-template <typename t_ans_model>
-void print_size_stats(quasi_succinct::ans_block_freq_index<t_ans_model>& coll)
-{
-    size_t freqs_size = 0;
-    size_t docs_size = 0;
-    size_t freqs_nonfull_size = 0;
-    size_t docs_nonfull_size = 0;
-    block_size_stats stats;
-    for (size_t i = 0; i < coll.size(); ++i) {
-        stats += coll[i].stats_size();
-    }
-    std::cout << stats;
 }
 
 template <typename Collection>
