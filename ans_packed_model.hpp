@@ -44,7 +44,7 @@ inline uint64_t ans_packed_vbyte_decode_u64(const uint8_t*& input)
     uint64_t shift = 0;
     while (true) {
         uint8_t c = *input++;
-        x += (uint32_t(c & 127) << shift);
+        x += (uint64_t(c & 127) << shift);
         if (!(c & 128)) {
             return x;
         }
@@ -190,7 +190,7 @@ struct ans_packed_enc_model {
 };
 
 struct ans_packed_mag_table {
-    uint32_t max_value;
+    uint64_t max_value;
     uint64_t counts[ans_packed_constants::MAX_MAG + 1];
 };
 
@@ -204,10 +204,10 @@ void print_mag_table(const ans_packed_mag_table* tb, std::string name)
 }
 
 struct ans_packed_dec_model {
-    uint32_t M = 0; // frame size
+    uint64_t M = 0; // frame size
     uint8_t log2_M = 0;
-    uint32_t mask_M = 0;
-    uint32_t norm_lower_bound = 0;
+    uint64_t mask_M = 0;
+    uint64_t norm_lower_bound = 0;
     mag_dec_table_entry table[0];
 };
 
@@ -512,7 +512,7 @@ struct ans_packed_model {
 
     static uint32_t decode_num(const ans_packed_dec_model* model, uint64_t& state, const uint8_t*& in)
     {
-        uint32_t state_mod_M = state & model->mask_M;
+        uint64_t state_mod_M = state & model->mask_M;
         const auto& entry = model->table[state_mod_M];
         uint32_t num = entry.sym;
         uint32_t f = entry.freq;
@@ -551,6 +551,7 @@ struct ans_packed_model {
             uint32_t dec_num = decode_num(cur_model, state, in);
             *out++ = dec_num - 1; // substract one as OT has 0s and our smallest num is 1
         }
+        std::cout << "final state = " << state << " norm_lower_bound = " << cur_model->norm_lower_bound << std::endl;
 
         return in;
     }

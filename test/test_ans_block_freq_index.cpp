@@ -19,7 +19,7 @@ void test_ans_block_freq_index()
     typename collection_type::builder b(universe, params);
 
     typedef std::vector<uint64_t> vec_type;
-    std::vector<std::pair<vec_type, vec_type>> posting_lists(30);
+    std::vector<std::pair<vec_type, vec_type>> posting_lists(3000);
     for (auto& plist : posting_lists) {
         double avg_gap = 1.1 + double(rand()) / RAND_MAX * 10;
         uint64_t n = uint64_t(universe / avg_gap);
