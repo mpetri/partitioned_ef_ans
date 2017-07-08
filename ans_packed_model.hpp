@@ -185,12 +185,12 @@ struct ans_packed_enc_model {
     uint8_t log2_M = 0;
     uint64_t mask_M = 0;
     uint64_t norm_lower_bound = 0;
-    uint64_t max_value = 0;
+    uint32_t max_value = 0;
     mag_enc_table_entry table[0];
 };
 
 struct ans_packed_mag_table {
-    uint64_t max_value;
+    uint32_t max_value;
     uint64_t counts[ans_packed_constants::MAX_MAG + 1];
 };
 
@@ -551,7 +551,6 @@ struct ans_packed_model {
             uint32_t dec_num = decode_num(cur_model, state, in);
             *out++ = dec_num - 1; // substract one as OT has 0s and our smallest num is 1
         }
-        std::cout << "final state = " << state << " norm_lower_bound = " << cur_model->norm_lower_bound << std::endl;
 
         return in;
     }
