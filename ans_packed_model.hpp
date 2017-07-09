@@ -477,7 +477,7 @@ struct ans_packed_model {
         ans_packed_vbyte_encode_u64(outvb, state);
     }
 
-    static void encode(uint32_t const* in, uint32_t /* sum_of_values */,
+    static void encode(uint32_t const* in, uint32_t sum_of_values,
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
         // (1) determine and encode model id
@@ -502,6 +502,10 @@ struct ans_packed_model {
             state = encode_num(cur_model, state, num, out_ptr);
         }
         flush_state(state - cur_model->norm_lower_bound, out_ptr);
+        if (sum_of_values == uint32_t(-1))
+            std::cout << "freq;" << (int)model_id << ";" << log2(state - cur_model->norm_lower_bound) << "\n";
+        else
+            std::cout << "docs;" << (int)model_id << ";" << log2(state - cur_model->norm_lower_bound) << "\n";
 
         // (3) copy to real out buf
         size_t enc_size = out_start - out_ptr;
