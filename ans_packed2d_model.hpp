@@ -1,226 +1,17 @@
 #pragma once
 
-#include "block_codecs.hpp"
-
-namespace ans_packed_constants {
-const uint8_t MAX_MAG = 32;
-const uint8_t NUM_MAGS = 16;
-const std::array<uint8_t, NUM_MAGS> SEL2MAG{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12,
-    14, 16, 19, 22, 32 };
-const std::array<uint8_t, MAX_MAG + 1> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
-    10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
-const uint64_t TOPFREQ = 1048576;
-const uint32_t OUTPUT_BASE = 256;
-const uint8_t OUTPUT_BASE_LOG2 = 8;
-}
-
-inline uint8_t ans_packed_vb_size(uint64_t x)
-{
-    if (x < (1ULL << 7)) {
-        return 1;
-    } else if (x < (1ULL << 14)) {
-        return 2;
-    } else if (x < (1ULL << 21)) {
-        return 3;
-    } else if (x < (1ULL << 28)) {
-        return 4;
-    } else if (x < (1ULL << 35)) {
-        return 5;
-    } else if (x < (1ULL << 42)) {
-        return 6;
-    } else if (x < (1ULL << 49)) {
-        return 7;
-    } else if (x < (1ULL << 56)) {
-        return 8;
-    } else {
-        return 9;
-    }
-    return 9;
-}
-
-inline uint64_t ans_packed_vbyte_decode_u64(const uint8_t*& input)
-{
-    uint64_t x = 0;
-    uint64_t shift = 0;
-    while (true) {
-        uint8_t c = *input++;
-        x += (uint64_t(c & 127) << shift);
-        if (!(c & 128)) {
-            return x;
-        }
-        shift += 7;
-    }
-    return x;
-}
-
-template <uint32_t i>
-inline uint8_t ans_packed_extract7bits(const uint64_t val)
-{
-    uint8_t v = static_cast<uint8_t>((val >> (7 * i)) & ((1ULL << 7) - 1));
-    return v;
-}
-
-template <uint32_t i>
-inline uint8_t ans_packed_extract7bitsmaskless(const uint64_t val)
-{
-    uint8_t v = static_cast<uint8_t>((val >> (7 * i)));
-    return v;
-}
-
-inline void ans_packed_vbyte_encode_u64(uint8_t*& out, uint64_t x)
-{
-    if (x < (1ULL << 7)) {
-        *out++ = static_cast<uint8_t>(x & 127);
-    } else if (x < (1ULL << 14)) {
-        *out++ = ans_packed_extract7bits<0>(x) | 128;
-        *out++ = ans_packed_extract7bitsmaskless<1>(x) & 127;
-    } else if (x < (1ULL << 21)) {
-        *out++ = ans_packed_extract7bits<0>(x) | 128;
-        *out++ = ans_packed_extract7bits<1>(x) | 128;
-        *out++ = ans_packed_extract7bitsmaskless<2>(x) & 127;
-    } else if (x < (1ULL << 28)) {
-        *out++ = ans_packed_extract7bits<0>(x) | 128;
-        *out++ = ans_packed_extract7bits<1>(x) | 128;
-        *out++ = ans_packed_extract7bits<2>(x) | 128;
-        *out++ = ans_packed_extract7bitsmaskless<3>(x) & 127;
-    } else if (x < (1ULL << 35)) {
-        *out++ = ans_packed_extract7bits<0>(x) | 128;
-        *out++ = ans_packed_extract7bits<1>(x) | 128;
-        *out++ = ans_packed_extract7bits<2>(x) | 128;
-        *out++ = ans_packed_extract7bits<3>(x) | 128;
-        *out++ = ans_packed_extract7bitsmaskless<4>(x) & 127;
-    } else if (x < (1ULL << 42)) {
-        *out++ = ans_packed_extract7bits<0>(x) | 128;
-        *out++ = ans_packed_extract7bits<1>(x) | 128;
-        *out++ = ans_packed_extract7bits<2>(x) | 128;
-        *out++ = ans_packed_extract7bits<3>(x) | 128;
-        *out++ = ans_packed_extract7bits<4>(x) | 128;
-        *out++ = ans_packed_extract7bitsmaskless<5>(x) & 127;
-    } else if (x < (1ULL << 49)) {
-        *out++ = ans_packed_extract7bits<0>(x) | 128;
-        *out++ = ans_packed_extract7bits<1>(x) | 128;
-        *out++ = ans_packed_extract7bits<2>(x) | 128;
-        *out++ = ans_packed_extract7bits<3>(x) | 128;
-        *out++ = ans_packed_extract7bits<4>(x) | 128;
-        *out++ = ans_packed_extract7bits<5>(x) | 128;
-        *out++ = ans_packed_extract7bitsmaskless<6>(x) & 127;
-    } else if (x < (1ULL << 56)) {
-        *out++ = ans_packed_extract7bits<0>(x) | 128;
-        *out++ = ans_packed_extract7bits<1>(x) | 128;
-        *out++ = ans_packed_extract7bits<2>(x) | 128;
-        *out++ = ans_packed_extract7bits<3>(x) | 128;
-        *out++ = ans_packed_extract7bits<4>(x) | 128;
-        *out++ = ans_packed_extract7bits<5>(x) | 128;
-        *out++ = ans_packed_extract7bitsmaskless<6>(x) & 127;
-    } else {
-        *out++ = ans_packed_extract7bits<0>(x) | 128;
-        *out++ = ans_packed_extract7bits<1>(x) | 128;
-        *out++ = ans_packed_extract7bits<2>(x) | 128;
-        *out++ = ans_packed_extract7bits<3>(x) | 128;
-        *out++ = ans_packed_extract7bits<4>(x) | 128;
-        *out++ = ans_packed_extract7bits<5>(x) | 128;
-        *out++ = ans_packed_extract7bits<6>(x) | 128;
-        *out++ = ans_packed_extract7bitsmaskless<7>(x) & 127;
-    }
-}
-
-uint8_t ans_packed_magnitude(uint32_t x)
-{
-    uint64_t y = x;
-    if (x == 1)
-        return 0;
-    uint32_t res = 63 - __builtin_clzll(y);
-    if ((1ULL << res) == y)
-        return res;
-    return res + 1;
-}
-
-uint32_t ans_max_val_in_mag(uint8_t mag, uint32_t max_val = 0)
-{
-    uint32_t maxv = 1;
-    if (mag != 0)
-        maxv = (1ULL << (mag));
-    if (maxv > max_val)
-        maxv = max_val;
-    return maxv;
-}
-
-uint32_t ans_min_val_in_mag(uint8_t mag)
-{
-    if (mag == 0)
-        return 1;
-    return (1ULL << (mag - 1)) + 1;
-}
-
-uint32_t ans_uniq_vals_in_mag(uint8_t mag, uint32_t max_val = 0)
-{
-    return ans_max_val_in_mag(mag, max_val) - ans_min_val_in_mag(mag) + 1;
-}
-
-uint64_t next_power_of_two(uint64_t x)
-{
-    if (x == 0) {
-        return 1;
-    }
-    uint32_t res = 63 - __builtin_clzll(x);
-    return (1ULL << (res + 1));
-}
-
-bool is_power_of_two(uint64_t x) { return ((x != 0) && !(x & (x - 1))); }
-
-struct mag_enc_table_entry {
-    uint32_t freq;
-    uint64_t base;
-    uint64_t SUB;
-};
-
-struct mag_dec_table_entry {
-    uint32_t freq;
-    uint64_t offset;
-    uint32_t sym;
-};
-
-struct ans_packed_enc_model {
-    uint64_t M = 0; // frame size
-    uint8_t log2_M = 0;
-    uint64_t mask_M = 0;
-    uint64_t norm_lower_bound = 0;
-    uint32_t max_value = 0;
-    mag_enc_table_entry table[0];
-};
-
-struct ans_packed_mag_table {
-    uint32_t max_value;
-    uint64_t counts[ans_packed_constants::MAX_MAG + 1];
-};
-
-void print_mag_table(const ans_packed_mag_table* tb, std::string name)
-{
-    std::cout << name << " max_value = " << tb->max_value << " COUNTS = (";
-    for (size_t i = 0; i <= ans_packed_constants::MAX_MAG; i++) {
-        std::cout << "<" << i << "," << tb->counts[i] << ">";
-    }
-    std::cout << ")" << std::endl;
-}
-
-struct ans_packed_dec_model {
-    uint64_t M = 0; // frame size
-    uint8_t log2_M = 0;
-    uint64_t mask_M = 0;
-    uint64_t norm_lower_bound = 0;
-    mag_dec_table_entry table[0];
-};
-
-using ans_packed_counts = ans_packed_mag_table[ans_packed_constants::NUM_MAGS];
+#include "ans_packed_model.hpp"
 
 namespace quasi_succinct {
 
-struct ans_packed_model {
+using ans_packed2d_counts = ans_packed_mag_table[ans_packed_constants::NUM_MAGS][ans_packed_constants::NUM_MAGS];
+
+struct ans_packed2d_model {
     static const uint64_t block_size = 128;
 
     static std::vector<uint8_t> create_empty_counts()
     {
-        size_t count_size = sizeof(ans_packed_counts);
+        size_t count_size = sizeof(ans_packed2d_counts);
         return std::vector<uint8_t>(count_size, 0);
     }
 
@@ -356,21 +147,23 @@ struct ans_packed_model {
 
     static std::vector<uint8_t> create_enc_model_from_counts(const std::vector<uint8_t>& cntsu8)
     {
-        auto counts_ptr = reinterpret_cast<const ans_packed_counts*>(cntsu8.data());
+        auto counts_ptr = reinterpret_cast<const ans_packed2d_counts*>(cntsu8.data());
         const ans_packed_counts& counts = *counts_ptr;
-        size_t pointers_to_models = ans_packed_constants::NUM_MAGS * sizeof(uint64_t);
+        size_t pointers_to_models = ans_packed_constants::NUM_MAGS * ans_packed_constants::NUM_MAGS * sizeof(uint64_t);
         std::vector<uint8_t> enc_models(pointers_to_models, 0);
 
         for (size_t i = 0; i < ans_packed_constants::NUM_MAGS; i++) {
-            // (1) store offset of model data in byte stream
-            size_t model_offset = enc_models.size();
-            // (2) create the model
-            bool empty_model = create_enc_model(enc_models, counts[i]);
-            auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(enc_models.data()) + i;
-            if (empty_model) {
-                *model_offset_u64_ptr = 0;
-            } else {
-                *model_offset_u64_ptr = model_offset;
+            for (size_t j = 0; j < ans_packed_constants::NUM_MAGS; j++) {
+                // (1) store offset of model data in byte stream
+                size_t model_offset = enc_models.size();
+                // (2) create the model
+                bool empty_model = create_enc_model(enc_models, counts[i][j]);
+                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(enc_models.data()) + i * ans_packed_constants::NUM_MAGS + j;
+                if (empty_model) {
+                    *model_offset_u64_ptr = 0;
+                } else {
+                    *model_offset_u64_ptr = model_offset;
+                }
             }
         }
         return enc_models;
@@ -405,129 +198,101 @@ struct ans_packed_model {
     static std::vector<uint8_t> create_dec_model(const std::vector<uint8_t>& enc_models_u8)
     {
         auto enc_models = reinterpret_cast<const uint64_t*>(enc_models_u8.data());
-        size_t pointers_to_models = ans_packed_constants::NUM_MAGS * sizeof(uint64_t);
+        size_t pointers_to_models = ans_packed_constants::NUM_MAGS * ans_packed_constants::NUM_MAGS * sizeof(uint64_t);
         std::vector<uint8_t> dec_models_u8(pointers_to_models, 0);
 
         for (size_t i = 0; i < ans_packed_constants::NUM_MAGS; i++) {
-            size_t dec_model_offset = dec_models_u8.size();
-            if (enc_models[i] != 0) {
-                size_t enc_model_offset = enc_models[i];
-                auto enc_model_ptr = reinterpret_cast<const ans_packed_enc_model*>(enc_models_u8.data() + enc_model_offset);
-                const ans_packed_enc_model& enc_model = *enc_model_ptr;
-                create_dec_model(dec_models_u8, enc_model);
-                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
-                *model_offset_u64_ptr = dec_model_offset;
-            } else {
-                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
-                *model_offset_u64_ptr = 0;
+            for (size_t j = 0; j < ans_packed_constants::NUM_MAGS; j++) {
+                size_t dec_model_offset = dec_models_u8.size();
+                if (enc_models[i * ans_packed_constants::NUM_MAGS + j] != 0) {
+                    size_t enc_model_offset = enc_models[i * ans_packed_constants::NUM_MAGS + j];
+                    auto enc_model_ptr = reinterpret_cast<const ans_packed_enc_model*>(enc_models_u8.data() + enc_model_offset);
+                    const ans_packed_enc_model& enc_model = *enc_model_ptr;
+                    create_dec_model(dec_models_u8, enc_model);
+                    auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i * ans_packed_constants::NUM_MAGS + j;
+                    *model_offset_u64_ptr = dec_model_offset;
+                } else {
+                    auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i * ans_packed_constants::NUM_MAGS + j;
+                    *model_offset_u64_ptr = 0;
+                }
             }
         }
         return dec_models_u8;
     }
 
-    static uint8_t pick_model(uint32_t const* in, size_t n)
+    static std::pair<uint8_t> pick_model(uint32_t const* in, size_t n)
     {
         uint32_t max_val = 0;
+        uint32_t min_val = std::numeric_limits<uint32_t>::max();
         for (size_t i = 0; i < n; i++) {
             max_val = std::max(max_val, in[i] + 1);
+            min_val = std::min(min_val, in[i] + 1);
         }
+        uint8_t min_mag = ans_packed_magnitude(min_val);
         uint8_t max_mag = ans_packed_magnitude(max_val);
-        return ans_packed_constants::MAG2SEL[max_mag];
+        return { ans_packed_constants::MAG2SEL[min_mag], ans_packed_constants::MAG2SEL[max_mag] };
     }
 
     static void model(std::vector<uint8_t>& cntsu8, uint32_t const* in, uint32_t /*sum_of_values*/, size_t n)
     {
-        auto counts_ptr = reinterpret_cast<ans_packed_counts*>(cntsu8.data());
+        auto counts_ptr = reinterpret_cast<ans_packed2d_counts*>(cntsu8.data());
         auto& counts = *counts_ptr;
-        auto model_id = pick_model(in, n);
+        auto block_mids = pick_model(in, n);
+        auto model_id_min = block_mids.first;
+        auto model_id_max = block_mids.second;
         uint32_t max_val = 0;
         for (size_t i = 0; i < n; i++) {
             uint8_t mag = ans_packed_magnitude(in[i] + 1);
-            counts[model_id].counts[mag]++;
+            counts[model_id_min][model_id_max].counts[mag]++;
             max_val = std::max(max_val, in[i] + 1);
         }
-        counts[model_id].max_value = std::max(max_val, counts[model_id].max_value);
+        counts[model_id_min][model_id_max].max_value = std::max(max_val, counts[model_id_min][model_id_max].max_value);
     }
 
-    static uint64_t encode_num(const ans_packed_enc_model* model, uint64_t state, uint32_t num, uint8_t*& out, bool start_block)
+    static uint64_t encode_num(const ans_packed_enc_model* model, uint64_t state, uint32_t num, uint8_t*& out)
     {
-        uint64_t start_state = state;
-
         const auto& entry = model->table[num];
         uint32_t f = entry.freq;
         uint64_t b = entry.base;
-
-        static double total_expected_bits = 0;
-        static double total_actual_bits = 0;
-        static double total_emitted_bits = 0;
-        if (start_block) {
-            total_expected_bits = 0;
-            total_actual_bits = 0;
-            total_emitted_bits = 0;
-        }
-
-        double expected_increase = double(model->M) / double(f);
-        double expected_bits = 0;
-        if (expected_increase != 0)
-            expected_bits = log2(expected_increase);
-
-        total_expected_bits += expected_bits;
         // (1) normalize
-
-        uint32_t bits_emitted = 0;
         while (state >= entry.SUB) {
             --out;
             *out = (uint8_t)(state & 0xFF);
             state = state >> ans_packed_constants::OUTPUT_BASE_LOG2;
-            bits_emitted += 8;
         }
-        total_emitted_bits += bits_emitted;
-
-        size_t state_after_norm = state;
 
         // (2) transform state
         uint64_t next = ((state / f) * model->M) + (state % f) + b;
-        double actual_bits = log2(next) - log2(state_after_norm);
-        total_actual_bits += actual_bits;
-
-        std::cout << "START ANS_ENCODE(num=" << num << ")\n";
-        std::cout << "\tstart_state = " << start_state << "\n";
-        std::cout << "\texpected_state_increase = " << expected_increase << "\n";
-        std::cout << "\texpected_bits_increase = " << expected_bits << "\n";
-        std::cout << "\tstate_after_normalization = " << state_after_norm << "\n";
-        std::cout << "\tbits_emitted = " << bits_emitted << "\n";
-        std::cout << "\tactual_state_increase = " << next - state_after_norm << "\n";
-        std::cout << "\tnew_state = " << next << "\n";
-        std::cout << "\tactual_bits_increase = " << actual_bits << "\n";
-        std::cout << "\ttotal_expected_bits = " << total_expected_bits << "\n";
-        std::cout << "\ttotal_actual_bits = " << total_actual_bits << "\n";
-        std::cout << "\ttotal_emitted_bits = " << total_emitted_bits << "\n";
-        std::cout << "STOP ANS_ENCODE(num=" << num << ")\n";
-
         return next;
     }
 
     static void flush_state(uint64_t state, uint8_t*& out)
     {
-        std::cout << "START FLUSH_STATE(state=" << state << ")\n";
-        std::cout << "\texpected_final_state_bits = " << log2(state) << "\n";
-
         uint8_t vb_size = ans_packed_vb_size(state);
-        std::cout << "\tactual_final_state_bits = " << vb_size * 8 << "\n";
-        std::cout << "STOP FLUSH_STATE(state=" << state << ")\n";
         out -= vb_size;
         auto outvb = out;
         ans_packed_vbyte_encode_u64(outvb, state);
+    }
+
+    static uint8_t pack_model_ids(std::pair<uint8_t, uint8_t> mids)
+    {
+        return (mids.first << 4) + mids.second;
+    }
+
+    static std::pair<uint8_t, uint8_t> unpack_model_ids(uint8_t pmi)
+    {
+        return { uint8_t(pmi >> 4), uint8_t(pmi & 15) };
     }
 
     static void encode(uint32_t const* in, uint32_t sum_of_values,
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
         // (1) determine and encode model id
-        auto model_id = pick_model(in, n);
-        out.push_back(model_id);
+        auto model_ids = pick_model(in, n);
+        uint8_t pmi = pack_model_ids(model_ids);
+        out.push_back(pmi);
 
-        if (model_id == 0) { // all 1s. continue
+        if (model_ids.second == 0) { // all 1s. continue
             return;
         }
 
@@ -535,14 +300,14 @@ struct ans_packed_model {
 
         // (2) reverse encode the block using the selected ANS model
         auto model_ptrs = reinterpret_cast<const uint64_t*>(enc_model_u8.data());
-        size_t model_offset = model_ptrs[model_id];
+        size_t model_offset = model_ptrs + model_ids.first * ans_packed_constants::NUM_MAGS + model_ids.second;
         auto cur_model = reinterpret_cast<const ans_packed_enc_model*>(enc_model_u8.data() + model_offset);
         uint64_t state = cur_model->norm_lower_bound;
         auto out_ptr = tmp_out_buf.data() + tmp_out_buf.size() - 1;
         auto out_start = out_ptr;
         for (size_t k = 0; k < n; k++) {
             uint32_t num = in[n - k - 1] + 1;
-            state = encode_num(cur_model, state, num, out_ptr, k == 0);
+            state = encode_num(cur_model, state, num, out_ptr);
         }
         flush_state(state - cur_model->norm_lower_bound, out_ptr);
 
@@ -574,17 +339,18 @@ struct ans_packed_model {
     decode(uint8_t const* in, uint32_t* out,
         uint32_t /* sum_of_values */, size_t n, uint8_t const* dec_model_u8)
     {
-        uint8_t model_id = *in++;
+        uint8_t pmi = *in++;
+        auto model_ids = unpack_model_ids(pmi);
 
         // uniform block
-        if (model_id == 0) {
+        if (model_ids.second == 0) {
             for (size_t i = 0; i < n; i++)
                 out[i] = 0;
             return in;
         }
 
         auto model_ptrs = reinterpret_cast<const uint64_t*>(dec_model_u8);
-        size_t model_offset = model_ptrs[model_id];
+        size_t model_offset = model_ptrs + model_ids.first * ans_packed_constants::NUM_MAGS + model_ids.second;
         auto cur_model = reinterpret_cast<const ans_packed_dec_model*>(dec_model_u8 + model_offset);
 
         uint64_t state = init_decoder_state(cur_model, in);
