@@ -502,10 +502,13 @@ struct ans_packed_model {
             state = encode_num(cur_model, state, num, out_ptr);
         }
         flush_state(state - cur_model->norm_lower_bound, out_ptr);
+        size_t fs = state - cur_model->norm_lower_bound;
+        if (fs < 2)
+            fs = 2;
         if (sum_of_values == uint32_t(-1))
-            std::cout << "freq;" << (int)model_id << ";" << log2(state - cur_model->norm_lower_bound) << "\n";
+            std::cout << "freq;" << (int)model_id << ";" << ceill(log2(fs)) << "\n";
         else
-            std::cout << "docs;" << (int)model_id << ";" << log2(state - cur_model->norm_lower_bound) << "\n";
+            std::cout << "docs;" << (int)model_id << ";" << ceill(log2(fs)) << "\n";
 
         // (3) copy to real out buf
         size_t enc_size = out_start - out_ptr;
