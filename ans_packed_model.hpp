@@ -10,11 +10,43 @@ const std::array<uint8_t, NUM_MAGS> SEL2MAG{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12,
 const std::array<uint8_t, MAX_MAG + 1> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
     10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
 const uint64_t TOPFREQ = 1048576;
-const uint8_t OUTPUT_BASE_LOG2 = 16;
-const uint32_t OUTPUT_BASE = 1 << OUTPUT_BASE_LOG2;
+const uint8_t OUTPUT_BASE_LOG2 = 32;
+const uint64_t OUTPUT_BASE = 1ULL << OUTPUT_BASE_LOG2;
+const uint64_t NORM_LOWER_BOUND = 1ULL << 24;
 }
 
 //#define ANS_DEBUG 1
+static int ANS_DEBUG_IN = 1000;
+static int ANS_DEBUG_OUT = 1;
+
+uint8_t state_bytes(uint64_t state)
+{
+    if (state < (1ULL << 8))
+        return 1;
+    if (state < (1ULL << 16))
+        return 2;
+    if (state < (1ULL << 24))
+        return 3;
+    if (state < (1ULL << 32))
+        return 4;
+    if (state < (1ULL << 40))
+        return 5;
+    if (state < (1ULL << 48))
+        return 6;
+    if (state < (1ULL << 56))
+        return 7;
+    return 8;
+}
+
+uint8_t pack_two_4bit_nums(uint8_t a, uint8_t b)
+{
+    return (a << 4) + b;
+}
+
+std::pair<uint8_t, uint8_t> unpack_two_4bit_nums(uint8_t x)
+{
+    return { (x >> 4), (x & 15) };
+}
 
 template <uint8_t t_width>
 void ans_packed_output_unit(uint8_t*& out, uint64_t& state)
@@ -47,20 +79,6 @@ void ans_packed_output_unit<16>(uint8_t*& out, uint64_t& state)
 }
 
 template <>
-void ans_packed_output_unit<24>(uint8_t*& out, uint64_t& state)
-{
-    --out;
-    *out = (uint8_t)(state & 0xFF);
-    state = state >> 8;
-    --out;
-    *out = (uint8_t)(state & 0xFF);
-    state = state >> 8;
-    --out;
-    *out = (uint8_t)(state & 0xFF);
-    state = state >> 8;
-}
-
-template <>
 void ans_packed_output_unit<32>(uint8_t*& out, uint64_t& state)
 {
     out -= 4;
@@ -70,7 +88,7 @@ void ans_packed_output_unit<32>(uint8_t*& out, uint64_t& state)
 }
 
 template <uint8_t t_width>
-void ans_packed_input_unit(const uint8_t*& in, uint64_t& state)
+void ans_packed_input_unit(const uint8_t*& in, uint64_t& state, size_t& enc_size)
 {
     static_assert(t_width % 8 == 0, "can only read byte-multiple units");
     uint8_t w = t_width;
@@ -78,43 +96,36 @@ void ans_packed_input_unit(const uint8_t*& in, uint64_t& state)
         uint8_t new_byte = *in++;
         state = (state << t_width) | uint64_t(new_byte);
         w -= 8;
+        enc_size--;
     }
 }
 
 template <>
-void ans_packed_input_unit<8>(const uint8_t*& in, uint64_t& state)
+void ans_packed_input_unit<8>(const uint8_t*& in, uint64_t& state, size_t& enc_size)
 {
     uint8_t new_byte = *in++;
     state = (state << 8) | uint64_t(new_byte);
+    enc_size--;
 }
 
 template <>
-void ans_packed_input_unit<16>(const uint8_t*& in, uint64_t& state)
+void ans_packed_input_unit<16>(const uint8_t*& in, uint64_t& state, size_t& enc_size)
 {
     const uint16_t* in16 = reinterpret_cast<const uint16_t*>(in);
     uint64_t new_unit = *in16;
     state = (state << 16) | new_unit;
     in += 2;
+    enc_size -= 2;
 }
 
 template <>
-void ans_packed_input_unit<24>(const uint8_t*& in, uint64_t& state)
-{
-    uint8_t new_byte = *in++;
-    state = (state << 8) | uint64_t(new_byte);
-    new_byte = *in++;
-    state = (state << 8) | uint64_t(new_byte);
-    new_byte = *in++;
-    state = (state << 8) | uint64_t(new_byte);
-}
-
-template <>
-void ans_packed_input_unit<32>(const uint8_t*& in, uint64_t& state)
+void ans_packed_input_unit<32>(const uint8_t*& in, uint64_t& state, size_t& enc_size)
 {
     const uint32_t* in32 = reinterpret_cast<const uint32_t*>(in);
     uint64_t new_unit = *in32;
     state = (state << 32) | new_unit;
     in += 4;
+    enc_size -= 4;
 }
 
 inline uint8_t ans_packed_vb_size(uint64_t x)
@@ -135,8 +146,6 @@ inline uint8_t ans_packed_vb_size(uint64_t x)
         return 7;
     } else if (x < (1ULL << 56)) {
         return 8;
-    } else {
-        return 9;
     }
     return 9;
 }
@@ -214,7 +223,8 @@ inline void ans_packed_vbyte_encode_u64(uint8_t*& out, uint64_t x)
         *out++ = ans_packed_extract7bits<3>(x) | 128;
         *out++ = ans_packed_extract7bits<4>(x) | 128;
         *out++ = ans_packed_extract7bits<5>(x) | 128;
-        *out++ = ans_packed_extract7bitsmaskless<6>(x) & 127;
+        *out++ = ans_packed_extract7bits<6>(x) | 128;
+        *out++ = ans_packed_extract7bitsmaskless<7>(x) & 127;
     } else {
         *out++ = ans_packed_extract7bits<0>(x) | 128;
         *out++ = ans_packed_extract7bits<1>(x) | 128;
@@ -223,7 +233,8 @@ inline void ans_packed_vbyte_encode_u64(uint8_t*& out, uint64_t x)
         *out++ = ans_packed_extract7bits<4>(x) | 128;
         *out++ = ans_packed_extract7bits<5>(x) | 128;
         *out++ = ans_packed_extract7bits<6>(x) | 128;
-        *out++ = ans_packed_extract7bitsmaskless<7>(x) & 127;
+        *out++ = ans_packed_extract7bits<7>(x) | 128;
+        *out++ = ans_packed_extract7bitsmaskless<8>(x) & 127;
     }
 }
 
@@ -443,7 +454,7 @@ struct ans_packed_model {
         }
 
         model.M = cumsum;
-        model.norm_lower_bound = ans_packed_constants::OUTPUT_BASE * model.M;
+        model.norm_lower_bound = ans_packed_constants::NORM_LOWER_BOUND;
         for (size_t j = 1; j < (norm_counts->max_value + 1); j++) {
             model.table[j].SUB = ((model.norm_lower_bound / model.M) * ans_packed_constants::OUTPUT_BASE)
                 * model.table[j].freq;
@@ -569,22 +580,24 @@ struct ans_packed_model {
             total_actual_bits = 0;
             total_emitted_bits = 0;
         }
-
         double expected_increase = double(model->M) / double(f);
         double expected_bits = 0;
         if (expected_increase != 0)
             expected_bits = log2(expected_increase);
 
         total_expected_bits += expected_bits;
+        uint32_t bits_emitted = 0;
 #endif
 
         // (1) normalize
         while (state >= entry.SUB) {
             ans_packed_output_unit<ans_packed_constants::OUTPUT_BASE_LOG2>(out, state);
+#ifdef ANS_DEBUG
+            bits_emitted += ans_packed_constants::OUTPUT_BASE_LOG2;
+#endif
         }
 
 #ifdef ANS_DEBUG
-        uint32_t bits_emitted = ans_packed_constants::OUTPUT_BASE_LOG2;
         total_emitted_bits += bits_emitted;
         size_t state_after_norm = state;
 #endif
@@ -592,39 +605,52 @@ struct ans_packed_model {
         // (2) transform state
         uint64_t next = ((state / f) * model->M) + (state % f) + b;
 #ifdef ANS_DEBUG
-        double actual_bits = log2(next) - log2(state_after_norm);
+        double actual_bits = log2(next);
+        if (state_after_norm != 0)
+            actual_bits -= log2(state_after_norm);
         total_actual_bits += actual_bits;
 
-        std::cout << "START ANS_ENCODE(num=" << num << ",freq="
-                  << entry.freq << ",base=" << b << ",SUB=" << entry.SUB << ",M=" << model->M << ")\n";
-        std::cout << "\tstart_state = " << start_state << "\n";
-        std::cout << "\texpected_state_increase = " << expected_increase << "\n";
-        std::cout << "\texpected_bits_increase = " << expected_bits << "\n";
-        std::cout << "\tstate_after_normalization = " << state_after_norm << "\n";
-        std::cout << "\tbits_emitted = " << bits_emitted << "\n";
-        std::cout << "\tactual_state_increase = " << next - state_after_norm << "\n";
-        std::cout << "\tnew_state = " << next << "\n";
-        std::cout << "\tactual_bits_increase = " << actual_bits << "\n";
-        std::cout << "\ttotal_expected_bits = " << total_expected_bits << "\n";
-        std::cout << "\ttotal_actual_bits = " << total_actual_bits << "\n";
-        std::cout << "\ttotal_emitted_bits = " << total_emitted_bits << "\n";
-        std::cout << "STOP ANS_ENCODE(num=" << num << ")\n";
+        if (ANS_DEBUG_IN > 0) {
+            std::cout << "START ANS_ENCODE(num=" << num << ",freq="
+                      << entry.freq << ",base=" << b << ",SUB="
+                      << entry.SUB << ",M=" << model->M << ",L=" << model->norm_lower_bound << ")\n";
+            std::cout << "\tstart_state = " << start_state << "\n";
+            std::cout << "\texpected_state_increase = " << expected_increase << "\n";
+            std::cout << "\texpected_bits_increase = " << expected_bits << "\n";
+            std::cout << "\tstate_after_normalization = " << state_after_norm << "\n";
+            std::cout << "\tbits_emitted = " << bits_emitted << "\n";
+            std::cout << "\tactual_state_increase = " << next - state_after_norm << "\n";
+            std::cout << "\tnew_state = " << next << "\n";
+            std::cout << "\tactual_bits_increase = " << actual_bits << "\n";
+            std::cout << "\ttotal_expected_bits = " << total_expected_bits << "\n";
+            std::cout << "\ttotal_actual_bits = " << total_actual_bits << "\n";
+            std::cout << "\ttotal_emitted_bits = " << total_emitted_bits << "\n";
+            std::cout << "STOP ANS_ENCODE(num=" << num << ")\n";
+        }
 #endif
 
         return next;
     }
 
-    static void flush_state(uint64_t state, uint8_t*& out)
+    static void flush_state(uint64_t state, uint8_t*& out, size_t num_bytes)
     {
-        uint8_t vb_size = ans_packed_vb_size(state);
-        out -= vb_size;
-        auto outvb = out;
-        ans_packed_vbyte_encode_u64(outvb, state);
 #ifdef ANS_DEBUG
-        std::cout << "START FLUSH_STATE(state=" << state << ")\n";
-        std::cout << "\texpected_final_state_bits = " << log2(state) << "\n";
-        std::cout << "\tactual_final_state_bits = " << vb_size * 8 << "\n";
-        std::cout << "STOP FLUSH_STATE(state=" << state << ")\n";
+        if (ANS_DEBUG_IN > 0) {
+            std::cout << "START FLUSH_STATE(state=" << state << ")\n";
+            std::cout << "\texpected_final_state_bits = " << log2(state) << "\n";
+            std::cout << "\tactual_final_state_bits = " << num_bytes * 8 << "\n";
+        }
+#endif
+        for (size_t i = 0; i < num_bytes; i++) {
+            uint8_t out_byte = state & 0xFF;
+            out--;
+            *out = out_byte;
+            state >>= 8;
+        }
+#ifdef ANS_DEBUG
+        if (ANS_DEBUG_IN > 0) {
+            std::cout << "STOP FLUSH_STATE(state=" << state << ")\n";
+        }
 #endif
     }
 
@@ -633,9 +659,10 @@ struct ans_packed_model {
     {
         // (1) determine and encode model id
         auto model_id = pick_model(in, n);
-        out.push_back(model_id);
 
         if (model_id == 0) { // all 1s. continue
+            uint8_t packed = pack_two_4bit_nums(model_id, 0);
+            out.push_back(packed);
             return;
         }
 
@@ -645,42 +672,77 @@ struct ans_packed_model {
         auto model_ptrs = reinterpret_cast<const uint64_t*>(enc_model_u8.data());
         size_t model_offset = model_ptrs[model_id];
         auto cur_model = reinterpret_cast<const ans_packed_enc_model*>(enc_model_u8.data() + model_offset);
-        uint64_t state = cur_model->norm_lower_bound;
+        uint64_t state = 0;
         auto out_ptr = tmp_out_buf.data() + tmp_out_buf.size() - 1;
         auto out_start = out_ptr;
         for (size_t k = 0; k < n; k++) {
             uint32_t num = in[n - k - 1] + 1;
             state = encode_num(cur_model, state, num, out_ptr, k == 0);
         }
-        flush_state(state - cur_model->norm_lower_bound, out_ptr);
-        // (3) copy to real out buf
         size_t enc_size = out_start - out_ptr;
-        out.insert(out.end(), out_ptr, out_ptr + enc_size);
+        size_t u32s_written = enc_size / sizeof(uint32_t);
+
+        // write model id and num final state bytes in 8bit
+        size_t fsb = state_bytes(state);
+        uint8_t packed = pack_two_4bit_nums(model_id, fsb);
+        out.push_back(packed);
+
+        // write the number of u32s of the output using vbyte
+        // likely 1 byte only
+        TightVariableByte::encode_single(u32s_written, out);
+
+        // (3) copy to real ANS out buf
+        flush_state(state, out_ptr, fsb);
+        size_t final_enc_size = out_start - out_ptr;
+        out.insert(out.end(), out_ptr, out_ptr + final_enc_size);
+        if (ANS_DEBUG_IN)
+            ANS_DEBUG_IN--;
     }
 
-    static uint32_t decode_num(const ans_packed_dec_model* model, uint64_t& state, const uint8_t*& in)
+    static uint32_t decode_num(const ans_packed_dec_model* model, uint64_t& state, const uint8_t*& in, size_t& enc_size)
     {
+        size_t state_start = state;
         uint64_t state_mod_M = state & model->mask_M;
         const auto& entry = model->table[state_mod_M];
         uint32_t num = entry.sym;
         uint32_t f = entry.freq;
         state = f * (state >> model->log2_M) + entry.offset;
-        while (state < model->norm_lower_bound) {
-            ans_packed_input_unit<ans_packed_constants::OUTPUT_BASE_LOG2>(in, state);
+        while (enc_size && state < model->norm_lower_bound) {
+            ans_packed_input_unit<ans_packed_constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
         }
+
+#ifdef ANS_DEBUG
+        if (ANS_DEBUG_OUT == 1) {
+            std::cout << "START ANS_DECODE_NUM()" << std::endl;
+            std::cout << "\tstate_start = " << state_start << std::endl;
+            std::cout << "\tstate = " << state << std::endl;
+            std::cout << "\tnorm_lower_bound = " << model->norm_lower_bound << std::endl;
+            std::cout << "\tenc_size = " << enc_size << std::endl;
+            std::cout << "STOP ANS_DECODE_NUM()" << std::endl;
+        }
+#endif
         return num;
     }
 
-    static uint64_t init_decoder_state(const ans_packed_dec_model* model, const uint8_t*& in)
+    static uint64_t init_decoder_state(const uint8_t*& in, uint8_t num_bytes)
     {
-        return ans_packed_vbyte_decode_u64(in) + model->norm_lower_bound;
+        uint64_t state = 0;
+        for (size_t i = 0; i < num_bytes; i++) {
+            uint8_t new_byte = *in++;
+            state <<= 8;
+            state = state + new_byte;
+        }
+        return state;
     }
 
     static uint8_t const*
     decode(uint8_t const* in, uint32_t* out,
         uint32_t /* sum_of_values */, size_t n, uint8_t const* dec_model_u8)
     {
-        uint8_t model_id = *in++;
+        uint8_t packed = *in++;
+        auto model_and_fsb = unpack_two_4bit_nums(packed);
+        uint8_t model_id = model_and_fsb.first;
+        uint8_t fsb = model_and_fsb.second;
 
         // uniform block
         if (model_id == 0) {
@@ -689,16 +751,32 @@ struct ans_packed_model {
             return in;
         }
 
+        uint32_t num_u32;
+        in = TightVariableByte::decode(in, &num_u32, 1);
+        size_t enc_size = num_u32 * sizeof(uint32_t);
+
         auto model_ptrs = reinterpret_cast<const uint64_t*>(dec_model_u8);
         size_t model_offset = model_ptrs[model_id];
         auto cur_model = reinterpret_cast<const ans_packed_dec_model*>(dec_model_u8 + model_offset);
 
-        uint64_t state = init_decoder_state(cur_model, in);
+        uint64_t state = init_decoder_state(in, fsb);
+
+#ifdef ANS_DEBUG
+        if (ANS_DEBUG_OUT == 1) {
+            std::cout << "START ANS_DECODE\n";
+            std::cout << "model_id = " << (int)model_id << std::endl;
+            std::cout << "fsb = " << (int)fsb << std::endl;
+            std::cout << "enc_size = " << enc_size << std::endl;
+            std::cout << "initial_state = " << state << std::endl;
+        }
+#endif
+
         for (size_t k = 0; k < n; k++) {
-            uint32_t dec_num = decode_num(cur_model, state, in);
+            uint32_t dec_num = decode_num(cur_model, state, in, enc_size);
             *out++ = dec_num - 1; // substract one as OT has 0s and our smallest num is 1
         }
 
+        ANS_DEBUG_OUT = 0;
         return in;
     }
 };
