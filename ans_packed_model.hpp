@@ -10,8 +10,111 @@ const std::array<uint8_t, NUM_MAGS> SEL2MAG{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12,
 const std::array<uint8_t, MAX_MAG + 1> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
     10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
 const uint64_t TOPFREQ = 1048576;
-const uint32_t OUTPUT_BASE = 256;
-const uint8_t OUTPUT_BASE_LOG2 = 8;
+const uint8_t OUTPUT_BASE_LOG2 = 16;
+const uint32_t OUTPUT_BASE = 1 << OUTPUT_BASE_LOG2;
+}
+
+//#define ANS_DEBUG 1
+
+template <uint8_t t_width>
+void ans_packed_output_unit(uint8_t*& out, uint64_t& state)
+{
+    static_assert(t_width % 8 == 0, "can only write byte-multiple units");
+    uint8_t w = t_width;
+    while (w) {
+        w -= 8;
+        --out;
+        *out = (uint8_t)(state & 0xFF);
+        state = state >> 8;
+    }
+}
+
+template <>
+void ans_packed_output_unit<8>(uint8_t*& out, uint64_t& state)
+{
+    --out;
+    *out = (uint8_t)(state & 0xFF);
+    state = state >> 8;
+}
+
+template <>
+void ans_packed_output_unit<16>(uint8_t*& out, uint64_t& state)
+{
+    out -= 2;
+    uint16_t* out16 = reinterpret_cast<uint16_t*>(out);
+    *out16 = (uint16_t)(state & 0xFFFF);
+    state = state >> 16;
+}
+
+template <>
+void ans_packed_output_unit<24>(uint8_t*& out, uint64_t& state)
+{
+    --out;
+    *out = (uint8_t)(state & 0xFF);
+    state = state >> 8;
+    --out;
+    *out = (uint8_t)(state & 0xFF);
+    state = state >> 8;
+    --out;
+    *out = (uint8_t)(state & 0xFF);
+    state = state >> 8;
+}
+
+template <>
+void ans_packed_output_unit<32>(uint8_t*& out, uint64_t& state)
+{
+    out -= 4;
+    uint32_t* out32 = reinterpret_cast<uint32_t*>(out);
+    *out32 = (uint32_t)(state & 0xFFFFFFFF);
+    state = state >> 32;
+}
+
+template <uint8_t t_width>
+void ans_packed_input_unit(const uint8_t*& in, uint64_t& state)
+{
+    static_assert(t_width % 8 == 0, "can only read byte-multiple units");
+    uint8_t w = t_width;
+    while (w) {
+        uint8_t new_byte = *in++;
+        state = (state << t_width) | uint64_t(new_byte);
+        w -= 8;
+    }
+}
+
+template <>
+void ans_packed_input_unit<8>(const uint8_t*& in, uint64_t& state)
+{
+    uint8_t new_byte = *in++;
+    state = (state << 8) | uint64_t(new_byte);
+}
+
+template <>
+void ans_packed_input_unit<16>(const uint8_t*& in, uint64_t& state)
+{
+    const uint16_t* in16 = reinterpret_cast<const uint16_t*>(in);
+    uint64_t new_unit = *in16;
+    state = (state << 16) | new_unit;
+    in += 2;
+}
+
+template <>
+void ans_packed_input_unit<24>(const uint8_t*& in, uint64_t& state)
+{
+    uint8_t new_byte = *in++;
+    state = (state << 8) | uint64_t(new_byte);
+    new_byte = *in++;
+    state = (state << 8) | uint64_t(new_byte);
+    new_byte = *in++;
+    state = (state << 8) | uint64_t(new_byte);
+}
+
+template <>
+void ans_packed_input_unit<32>(const uint8_t*& in, uint64_t& state)
+{
+    const uint32_t* in32 = reinterpret_cast<const uint32_t*>(in);
+    uint64_t new_unit = *in32;
+    state = (state << 32) | new_unit;
+    in += 4;
 }
 
 inline uint8_t ans_packed_vb_size(uint64_t x)
@@ -449,14 +552,15 @@ struct ans_packed_model {
         counts[model_id].max_value = std::max(max_val, counts[model_id].max_value);
     }
 
-    static uint64_t encode_num(const ans_packed_enc_model* model, uint64_t state, uint32_t num, uint8_t*& out, bool start_block)
+    static uint64_t encode_num(const ans_packed_enc_model* model, uint64_t state,
+        uint32_t num, uint8_t*& out, bool start_block)
     {
-        uint64_t start_state = state;
-
         const auto& entry = model->table[num];
         uint32_t f = entry.freq;
         uint64_t b = entry.base;
 
+#ifdef ANS_DEBUG
+        uint64_t start_state = state;
         static double total_expected_bits = 0;
         static double total_actual_bits = 0;
         static double total_emitted_bits = 0;
@@ -472,25 +576,27 @@ struct ans_packed_model {
             expected_bits = log2(expected_increase);
 
         total_expected_bits += expected_bits;
+#endif
+
         // (1) normalize
-
-        uint32_t bits_emitted = 0;
         while (state >= entry.SUB) {
-            --out;
-            *out = (uint8_t)(state & 0xFF);
-            state = state >> ans_packed_constants::OUTPUT_BASE_LOG2;
-            bits_emitted += 8;
+            ans_packed_output_unit<ans_packed_constants::OUTPUT_BASE_LOG2>(out, state);
         }
-        total_emitted_bits += bits_emitted;
 
+#ifdef ANS_DEBUG
+        uint32_t bits_emitted = ans_packed_constants::OUTPUT_BASE_LOG2;
+        total_emitted_bits += bits_emitted;
         size_t state_after_norm = state;
+#endif
 
         // (2) transform state
         uint64_t next = ((state / f) * model->M) + (state % f) + b;
+#ifdef ANS_DEBUG
         double actual_bits = log2(next) - log2(state_after_norm);
         total_actual_bits += actual_bits;
 
-        std::cout << "START ANS_ENCODE(num=" << num << ")\n";
+        std::cout << "START ANS_ENCODE(num=" << num << ",freq="
+                  << entry.freq << ",base=" << b << ",SUB=" << entry.SUB << ",M=" << model->M << ")\n";
         std::cout << "\tstart_state = " << start_state << "\n";
         std::cout << "\texpected_state_increase = " << expected_increase << "\n";
         std::cout << "\texpected_bits_increase = " << expected_bits << "\n";
@@ -503,24 +609,26 @@ struct ans_packed_model {
         std::cout << "\ttotal_actual_bits = " << total_actual_bits << "\n";
         std::cout << "\ttotal_emitted_bits = " << total_emitted_bits << "\n";
         std::cout << "STOP ANS_ENCODE(num=" << num << ")\n";
+#endif
 
         return next;
     }
 
     static void flush_state(uint64_t state, uint8_t*& out)
     {
-        std::cout << "START FLUSH_STATE(state=" << state << ")\n";
-        std::cout << "\texpected_final_state_bits = " << log2(state) << "\n";
-
         uint8_t vb_size = ans_packed_vb_size(state);
-        std::cout << "\tactual_final_state_bits = " << vb_size * 8 << "\n";
-        std::cout << "STOP FLUSH_STATE(state=" << state << ")\n";
         out -= vb_size;
         auto outvb = out;
         ans_packed_vbyte_encode_u64(outvb, state);
+#ifdef ANS_DEBUG
+        std::cout << "START FLUSH_STATE(state=" << state << ")\n";
+        std::cout << "\texpected_final_state_bits = " << log2(state) << "\n";
+        std::cout << "\tactual_final_state_bits = " << vb_size * 8 << "\n";
+        std::cout << "STOP FLUSH_STATE(state=" << state << ")\n";
+#endif
     }
 
-    static void encode(uint32_t const* in, uint32_t sum_of_values,
+    static void encode(uint32_t const* in, uint32_t /*sum_of_values*/,
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
         // (1) determine and encode model id
@@ -545,7 +653,6 @@ struct ans_packed_model {
             state = encode_num(cur_model, state, num, out_ptr, k == 0);
         }
         flush_state(state - cur_model->norm_lower_bound, out_ptr);
-
         // (3) copy to real out buf
         size_t enc_size = out_start - out_ptr;
         out.insert(out.end(), out_ptr, out_ptr + enc_size);
@@ -559,8 +666,7 @@ struct ans_packed_model {
         uint32_t f = entry.freq;
         state = f * (state >> model->log2_M) + entry.offset;
         while (state < model->norm_lower_bound) {
-            uint8_t new_byte = *in++;
-            state = (state << ans_packed_constants::OUTPUT_BASE_LOG2) | uint64_t(new_byte);
+            ans_packed_input_unit<ans_packed_constants::OUTPUT_BASE_LOG2>(in, state);
         }
         return num;
     }
