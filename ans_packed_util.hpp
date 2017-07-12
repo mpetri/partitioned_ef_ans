@@ -55,10 +55,10 @@ void print_enc_model(const enc_model* m)
               << " mask_M = " << m->mask_M
               << " norm_lower_bound = " << m->norm_lower_bound
               << " max_value = " << (int)m->max_value << "\n";
-    std::cout << "TABLE = [";
+    std::cout << "TABLE[0-4] = [";
     size_t b = m->max_value;
-    if (b > 256)
-        b = 256;
+    if (b > 5)
+        b = 5;
     for (size_t i = 0; i < b; i++) {
         std::cout << m->table[i];
     }
