@@ -217,35 +217,35 @@ void create_collection(InputCollection const& input,
     double tick = get_time_usecs();
     double user_tick = get_user_time_usecs();
 
-    typename CollectionType::builder builder(input.num_docs(), params);
-
+    progress_logger plog("Coding");
+    CollectionType coll;
     {
-        progress_logger mplog("Modelling");
+        typename CollectionType::builder builder(input.num_docs(), params);
+        {
+            progress_logger mplog("Modelling");
+            for (auto const& plist : input) {
+                uint64_t freqs_sum = std::accumulate(plist.freqs.begin(),
+                    plist.freqs.end(), uint64_t(0));
+
+                builder.model_posting_list(plist.docs.size(), plist.docs.begin(),
+                    plist.freqs.begin(), freqs_sum);
+                mplog.done_sequence(plist.docs.size());
+            }
+            builder.freeze_models();
+            mplog.log();
+        }
+
         for (auto const& plist : input) {
             uint64_t freqs_sum = std::accumulate(plist.freqs.begin(),
                 plist.freqs.end(), uint64_t(0));
 
-            builder.model_posting_list(plist.docs.size(), plist.docs.begin(),
+            builder.add_posting_list(plist.docs.size(), plist.docs.begin(),
                 plist.freqs.begin(), freqs_sum);
-            mplog.done_sequence(plist.docs.size());
+            plog.done_sequence(plist.docs.size());
         }
-        builder.freeze_models();
-        mplog.log();
+        plog.log();
+        builder.build(coll);
     }
-
-    progress_logger plog("Coding");
-    for (auto const& plist : input) {
-        uint64_t freqs_sum = std::accumulate(plist.freqs.begin(),
-            plist.freqs.end(), uint64_t(0));
-
-        builder.add_posting_list(plist.docs.size(), plist.docs.begin(),
-            plist.freqs.begin(), freqs_sum);
-        plog.done_sequence(plist.docs.size());
-    }
-
-    plog.log();
-    CollectionType coll;
-    builder.build(coll);
     double elapsed_secs = (get_time_usecs() - tick) / 1000000;
     double user_elapsed_secs = (get_user_time_usecs() - user_tick) / 1000000;
     logger() << seq_type << " collection built in "
