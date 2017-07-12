@@ -31,7 +31,7 @@ struct model_max_1d {
         uint8_t packed = ans_packed::pack_two_4bit_nums(bh.model_id, bh.final_state_bytes);
         out.push_back(packed);
         if (bh.model_id != 0) {
-            out.push_back(bh.num_ans_u32s);
+            out.push_back(uint8_t(bh.num_ans_u32s));
         }
     }
 
@@ -167,6 +167,8 @@ struct ans_packed_model {
 
         model.M = cumsum;
         model.norm_lower_bound = ans_packed::constants::NORM_LOWER_BOUND;
+        if (model.norm_lower_bound < model.M)
+            model.norm_lower_bound = model.M;
         for (size_t j = 1; j < (norm_counts->max_value + 1); j++) {
             model.table[j].SUB = ((model.norm_lower_bound / model.M) * ans_packed::constants::OUTPUT_BASE)
                 * model.table[j].freq;
