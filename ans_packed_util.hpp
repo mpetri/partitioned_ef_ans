@@ -56,7 +56,10 @@ void print_enc_model(const enc_model* m)
               << " norm_lower_bound = " << m->norm_lower_bound
               << " max_value = " << (int)m->max_value << "\n";
     std::cout << "TABLE = [";
-    for (size_t i = 0; i < m->max_value; i++) {
+    size_t b = m->max_value;
+    if (b > 256)
+        b = 256;
+    for (size_t i = 0; i < b; i++) {
         std::cout << m->table[i];
     }
     std::cout << "]\n";
