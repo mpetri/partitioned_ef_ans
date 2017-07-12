@@ -400,7 +400,7 @@ static mag_table* normalize_counts(const mag_table* table)
             }
         }
     }
-    // print_mag_table(nfreqs, "second_phase");
+    print_mag_table(nfreqs, "second_phase");
 
     /* now, what does it all add up to? */
     uint64_t M = 0;
@@ -421,7 +421,12 @@ static mag_table* normalize_counts(const mag_table* table)
         nfreqs->counts[m] += adder;
     }
     if (excess != 0) {
-        nfreqs->counts[min_mag] += excess;
+        if (min_mag != 0) {
+            size_t excess_for_min_mag = excess / uniq_vals_in_mag(m, nfreqs->max_value);
+            excess -= excess_for_min_mag;
+            nfreqs->counts[min_mag] += excess_for_min_mag;
+        }
+        nfreqs->counts[0] += excess;
     }
     print_mag_table(nfreqs, "final_phase");
 
