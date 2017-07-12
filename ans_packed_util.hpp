@@ -423,7 +423,8 @@ static mag_table* normalize_counts(const mag_table* table)
     if (excess != 0) {
         if (min_mag != 0) {
             size_t excess_for_min_mag = excess / uniq_vals_in_mag(min_mag, nfreqs->max_value);
-            excess -= excess_for_min_mag;
+            size_t excess_sub = excess_for_min_mag * uniq_vals_in_mag(min_mag, nfreqs->max_value);
+            excess -= excess_sub;
             nfreqs->counts[min_mag] += excess_for_min_mag;
         }
         nfreqs->counts[0] += excess;
