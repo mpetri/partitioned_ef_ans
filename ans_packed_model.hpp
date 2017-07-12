@@ -54,7 +54,7 @@ struct model_minmax_2d {
         uint32_t max_val = 0;
         uint32_t min_val = std::numeric_limits<uint32_t>::max();
         for (size_t i = 0; i < n; i++) {
-            min_val = std::max(min_val, in[i] + 1);
+            min_val = std::min(min_val, in[i] + 1);
             max_val = std::max(max_val, in[i] + 1);
         }
         uint8_t min_mag = ans_packed::magnitude(min_val);
