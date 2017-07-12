@@ -361,17 +361,21 @@ static mag_table* normalize_counts(const mag_table* table)
         nfreqs->counts[i] = table->counts[i];
     }
 
+    uint8_t min_mag = constants::MAX_MAG;
     uint8_t max_mag = 0;
     for (size_t i = 0; i <= constants::MAX_MAG; i++) {
-        if (nfreqs->counts[i] != 0)
+        if (nfreqs->counts[i] != 0) {
             max_mag = i;
+            if (min_mag > i)
+                min_mag = i;
+        }
     }
     /* first phase in scaling process, distribute out the
            last bucket, assume it is the smallest n(s) area, scale
            the rest by the same amount */
     auto bucket_size = uniq_vals_in_mag(max_mag, nfreqs->max_value);
     double C = 0.5 * bucket_size / nfreqs->counts[max_mag];
-    for (size_t m = 0; m <= max_mag; m++) {
+    for (size_t m = min_mag; m <= max_mag; m++) {
         bucket_size = uniq_vals_in_mag(m, nfreqs->max_value);
         nfreqs->counts[m] = 0.5 + nfreqs->counts[m] * C / bucket_size;
         if (table->counts[m] != 0 && nfreqs->counts[m] < 1) {
@@ -381,15 +385,15 @@ static mag_table* normalize_counts(const mag_table* table)
     // print_mag_table(nfreqs, "first_phase");
     /* second step in scaling process, to make the first freq
            less than or equal to TOPFREQ
-        */
-    if (nfreqs->counts[0] > constants::TOPFREQ) {
+     */
+    if (nfreqs->counts[min_mag] > constants::TOPFREQ) {
         C = 1.0 * constants::TOPFREQ / nfreqs->counts[0];
-        nfreqs->counts[0] = constants::TOPFREQ;
+        nfreqs->counts[min_mag] = constants::TOPFREQ;
         /* scale all the others, rounding up so not zero anywhere,
                and at the same time, spread right across the bucketed
                range
             */
-        for (uint8_t m = 1; m <= max_mag; m++) {
+        for (uint8_t m = min_mag + 1; m <= max_mag; m++) {
             nfreqs->counts[m] = 0.5 + nfreqs->counts[m] * C;
             if (table->counts[m] != 0 && nfreqs->counts[m] == 0) {
                 nfreqs->counts[m] = 1;
@@ -400,7 +404,7 @@ static mag_table* normalize_counts(const mag_table* table)
 
     /* now, what does it all add up to? */
     uint64_t M = 0;
-    for (size_t m = 0; m <= max_mag; m++) {
+    for (size_t m = min_mag; m <= max_mag; m++) {
         M += nfreqs->counts[m] * uniq_vals_in_mag(m, nfreqs->max_value);
     }
     /* fourth phase, round up to a power of two and then redistribute */
@@ -409,7 +413,7 @@ static mag_table* normalize_counts(const mag_table* table)
     /* flow that excess count backwards to the beginning of
            the selectors array, spreading it out across the buckets...
         */
-    for (int8_t m = int8_t(max_mag); m >= 0; m--) {
+    for (int8_t m = int8_t(max_mag); m >= min_mag; m--) {
         double ratio = 1.0 * excess / M;
         uint64_t adder = ratio * nfreqs->counts[m];
         excess -= uniq_vals_in_mag(m, nfreqs->max_value) * adder;
@@ -417,17 +421,12 @@ static mag_table* normalize_counts(const mag_table* table)
         nfreqs->counts[m] += adder;
     }
     if (excess != 0) {
-        for (size_t m = 0; m <= max_mag; m++) {
-            if (nfreqs->counts[m] != 0) {
-                nfreqs->counts[m] += excess;
-                break;
-            }
-        }
+        nfreqs->counts[min_mag] += excess;
     }
     print_mag_table(nfreqs, "final_phase");
 
     M = 0;
-    for (size_t i = 0; i <= max_mag; i++) {
+    for (size_t i = min_mag; i <= max_mag; i++) {
         M += int64_t(nfreqs->counts[i] * uniq_vals_in_mag(i, nfreqs->max_value));
     }
 
