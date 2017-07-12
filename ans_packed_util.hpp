@@ -422,7 +422,7 @@ static mag_table* normalize_counts(const mag_table* table)
     }
     if (excess != 0) {
         if (min_mag != 0) {
-            size_t excess_for_min_mag = excess / uniq_vals_in_mag(m, nfreqs->max_value);
+            size_t excess_for_min_mag = excess / uniq_vals_in_mag(min_mag, nfreqs->max_value);
             excess -= excess_for_min_mag;
             nfreqs->counts[min_mag] += excess_for_min_mag;
         }
@@ -431,7 +431,7 @@ static mag_table* normalize_counts(const mag_table* table)
     print_mag_table(nfreqs, "final_phase");
 
     M = 0;
-    for (size_t i = min_mag; i <= max_mag; i++) {
+    for (size_t i = 0; i <= max_mag; i++) {
         M += int64_t(nfreqs->counts[i] * uniq_vals_in_mag(i, nfreqs->max_value));
     }
 
