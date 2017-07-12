@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <iostream>
 #include <utility>
 
 namespace ans_packed {
@@ -26,6 +27,12 @@ struct mag_enc_table_entry {
     uint64_t SUB;
 };
 
+std::ostream& operator<<(std::ostream& os, const mag_enc_table_entry& t)
+{
+    os << "<f=" << t.freq << ",b=" << t.base << ",SUB=" << t.SUB << ">";
+    return os;
+}
+
 struct mag_dec_table_entry {
     uint32_t freq;
     uint64_t offset;
@@ -41,10 +48,33 @@ struct enc_model {
     mag_enc_table_entry table[0];
 };
 
+void print_enc_model(const enc_model* m)
+{
+    std::cout << "ENC_MODEL M=" << m->M
+              << " log2_M = " << (int)m->log2_M
+              << " mask_M = " << m->mask_M
+              << " norm_lower_bound = " << m->norm_lower_bound
+              << " max_value = " << (int)m->max_value << "\n";
+    std::cout << "TABLE = [";
+    for (size_t i = 0; i < m->max_value; i++) {
+        std::cout << m->table[i];
+    }
+    std::cout << "]\n";
+}
+
 struct mag_table {
     uint32_t max_value;
     uint64_t counts[constants::MAX_MAG + 1];
 };
+
+void print_mag_table(const mag_table* tb, std::string name)
+{
+    std::cout << name << " max_value = " << tb->max_value << " COUNTS = (";
+    for (size_t i = 0; i <= constants::MAX_MAG; i++) {
+        std::cout << "<" << i << "," << tb->counts[i] << ">";
+    }
+    std::cout << ")" << std::endl;
+}
 
 struct dec_model {
     uint64_t M = 0; // frame size
@@ -319,7 +349,7 @@ bool is_power_of_two(uint64_t x) { return ((x != 0) && !(x & (x - 1))); }
 
 static mag_table* normalize_counts(const mag_table* table)
 {
-    // print_mag_table(table, "initial_freqs");
+    print_mag_table(table, "initial_freqs");
     mag_table* nfreqs = new mag_table;
     nfreqs->max_value = table->max_value;
     uint64_t initial_sum = 0;
@@ -384,9 +414,14 @@ static mag_table* normalize_counts(const mag_table* table)
         nfreqs->counts[m] += adder;
     }
     if (excess != 0) {
-        nfreqs->counts[0] += excess;
+        for (size_t m = 0; m <= max_mag; m++) {
+            if (nfreqs->counts[m] != 0) {
+                nfreqs->counts[m] += excess;
+                break;
+            }
+        }
     }
-    // print_mag_table(nfreqs, "final_phase");
+    print_mag_table(nfreqs, "final_phase");
 
     M = 0;
     for (size_t i = 0; i <= max_mag; i++) {

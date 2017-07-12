@@ -175,6 +175,8 @@ struct ans_packed_model {
         model.log2_M = log2(model.M);
         model.max_value = norm_counts->max_value;
 
+        print_enc_model(&model);
+
         enc_models.insert(enc_models.end(), new_model.begin(), new_model.end());
         delete norm_counts;
         return false;
