@@ -6,7 +6,7 @@
 #include "ans_block_posting_list.hpp"
 #include "compact_elias_fano.hpp"
 
-#include "ans_packed_model.hpp"
+#include "ans_models.hpp"
 
 namespace quasi_succinct {
 

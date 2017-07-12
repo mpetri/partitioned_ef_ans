@@ -43,7 +43,9 @@ typedef block_freq_index<quasi_succinct::vbyte_block> block_vbyte_index;
 
 typedef block_freq_index<quasi_succinct::simple16_block> block_simple16_index;
 
-typedef ans_block_freq_index<quasi_succinct::ans_packed_model> block_anspacked_index;
+typedef ans_block_freq_index<quasi_succinct::ans_packed_model<model_max_1d>> block_anspacked_index;
+typedef ans_block_freq_index<quasi_succinct::ans_packed_model<model_minmax_2d>> block_anspackedminmax_index;
+typedef ans_block_freq_index<quasi_succinct::ans_packed_model<model_med90p_2d>> block_anspackedmed90p_index;
 }
 
-#define QS_INDEX_TYPES (ef)(single)(uniform)(opt)(block_optpfor)(block_varint)(block_interpolative)(block_u32)(block_vbyte)(block_simple16)(block_anspacked)
+#define QS_INDEX_TYPES (ef)(single)(uniform)(opt)(block_optpfor)(block_varint)(block_interpolative)(block_u32)(block_vbyte)(block_simple16)(block_anspacked)(block_anspackedminmax)(block_anspackedmed90p)

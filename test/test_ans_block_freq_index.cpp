@@ -66,5 +66,7 @@ void test_ans_block_freq_index()
 
 BOOST_AUTO_TEST_CASE(ans_block_freq_index)
 {
-    test_ans_block_freq_index<quasi_succinct::ans_packed_model>();
+    test_ans_block_freq_index<quasi_succinct::ans_packed_model<model_max_1d>>();
+    test_ans_block_freq_index<quasi_succinct::ans_packed_model<model_minmax_2d>>();
+    test_ans_block_freq_index<quasi_succinct::ans_packed_model<model_med90p_2d>>();
 }

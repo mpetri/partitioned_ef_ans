@@ -7,9 +7,10 @@
 namespace ans_packed {
 
 namespace constants {
+    const uint32_t BLOCK_SIZE = 128;
     const uint8_t MAX_MAG = 32;
-    const uint8_t NUM_MAGS = 16;
-    const std::array<uint8_t, NUM_MAGS> SEL2MAG{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12,
+    const uint8_t NUM_MODELS = 16;
+    const std::array<uint8_t, NUM_MODELS> SEL2MAG{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12,
         14, 16, 19, 22, 32 };
     const std::array<uint8_t, MAX_MAG + 1> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
         10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
@@ -315,4 +316,88 @@ uint64_t next_power_of_two(uint64_t x)
 }
 
 bool is_power_of_two(uint64_t x) { return ((x != 0) && !(x & (x - 1))); }
+
+static mag_table* normalize_counts(const mag_table* table)
+{
+    // print_mag_table(table, "initial_freqs");
+    mag_table* nfreqs = new mag_table;
+    nfreqs->max_value = table->max_value;
+    uint64_t initial_sum = 0;
+    for (size_t i = 0; i <= constants::MAX_MAG; i++) {
+        initial_sum += table->counts[i] * uniq_vals_in_mag(i, table->max_value);
+        nfreqs->counts[i] = table->counts[i];
+    }
+
+    uint8_t max_mag = 0;
+    for (size_t i = 0; i <= constants::MAX_MAG; i++) {
+        if (nfreqs->counts[i] != 0)
+            max_mag = i;
+    }
+    /* first phase in scaling process, distribute out the
+           last bucket, assume it is the smallest n(s) area, scale
+           the rest by the same amount */
+    auto bucket_size = uniq_vals_in_mag(max_mag, nfreqs->max_value);
+    double C = 0.5 * bucket_size / nfreqs->counts[max_mag];
+    for (size_t m = 0; m <= max_mag; m++) {
+        bucket_size = uniq_vals_in_mag(m, nfreqs->max_value);
+        nfreqs->counts[m] = 0.5 + nfreqs->counts[m] * C / bucket_size;
+        if (table->counts[m] != 0 && nfreqs->counts[m] < 1) {
+            nfreqs->counts[m] = 1;
+        }
+    }
+    // print_mag_table(nfreqs, "first_phase");
+    /* second step in scaling process, to make the first freq
+           less than or equal to TOPFREQ
+        */
+    if (nfreqs->counts[0] > constants::TOPFREQ) {
+        C = 1.0 * constants::TOPFREQ / nfreqs->counts[0];
+        nfreqs->counts[0] = constants::TOPFREQ;
+        /* scale all the others, rounding up so not zero anywhere,
+               and at the same time, spread right across the bucketed
+               range
+            */
+        for (uint8_t m = 1; m <= max_mag; m++) {
+            nfreqs->counts[m] = 0.5 + nfreqs->counts[m] * C;
+            if (table->counts[m] != 0 && nfreqs->counts[m] == 0) {
+                nfreqs->counts[m] = 1;
+            }
+        }
+    }
+    // print_mag_table(nfreqs, "second_phase");
+
+    /* now, what does it all add up to? */
+    uint64_t M = 0;
+    for (size_t m = 0; m <= max_mag; m++) {
+        M += nfreqs->counts[m] * uniq_vals_in_mag(m, nfreqs->max_value);
+    }
+    /* fourth phase, round up to a power of two and then redistribute */
+    uint64_t target_power = next_power_of_two(M);
+    uint64_t excess = target_power - M;
+    /* flow that excess count backwards to the beginning of
+           the selectors array, spreading it out across the buckets...
+        */
+    for (int8_t m = int8_t(max_mag); m >= 0; m--) {
+        double ratio = 1.0 * excess / M;
+        uint64_t adder = ratio * nfreqs->counts[m];
+        excess -= uniq_vals_in_mag(m, nfreqs->max_value) * adder;
+        M -= uniq_vals_in_mag(m, nfreqs->max_value) * nfreqs->counts[m];
+        nfreqs->counts[m] += adder;
+    }
+    if (excess != 0) {
+        nfreqs->counts[0] += excess;
+    }
+    // print_mag_table(nfreqs, "final_phase");
+
+    M = 0;
+    for (size_t i = 0; i <= max_mag; i++) {
+        M += int64_t(nfreqs->counts[i] * uniq_vals_in_mag(i, nfreqs->max_value));
+    }
+
+    if (!is_power_of_two(M)) {
+        fprintf(stderr, "ERROR! not power of 2 after normalization = %lu\n", M);
+        exit(EXIT_FAILURE);
+    }
+
+    return nfreqs;
+}
 }
