@@ -50,9 +50,6 @@ public:
         {
             m_doc_enc_model = t_ansmodel::create_enc_model_from_counts(m_doc_counts);
             m_freq_enc_model = t_ansmodel::create_enc_model_from_counts(m_freq_counts);
-
-            m_doc_dec_model = t_ansmodel::create_dec_model(m_doc_enc_model);
-            m_freq_dec_model = t_ansmodel::create_dec_model(m_freq_enc_model);
         }
 
         void build(ans_block_freq_index& sq)
@@ -61,8 +58,10 @@ public:
             sq.m_size = m_endpoints.size() - 1;
             sq.m_num_docs = m_num_docs;
             sq.m_lists.steal(m_lists);
-            sq.m_doc_dec_model.steal(m_doc_dec_model);
-            sq.m_freq_dec_model.steal(m_freq_dec_model);
+            sq.m_doc_dec_model = t_ansmodel::create_dec_model(m_doc_enc_model);
+            sq.m_freq_dec_model = t_ansmodel::create_dec_model(m_freq_enc_model);
+            m_doc_enc_model.clear();
+            m_freq_enc_model.clear();
 
             succinct::bit_vector_builder bvb;
             compact_elias_fano::write(bvb, m_endpoints.begin(),
