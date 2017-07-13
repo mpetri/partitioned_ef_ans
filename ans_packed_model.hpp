@@ -162,7 +162,7 @@ struct ans_packed_model {
 
             bool empty_model = false;
             bool compact_model = false;
-            if (counts[i].max_value < ans_packed::constants::COMPACT_MODEL_THRESHOLD) {
+            if (counts[i].max_value < ans_packed::constants::COMPACT_ENCMODEL_THRESHOLD) {
                 empty_model = create_enc_model(enc_models, counts[i]);
             } else {
                 compact_model = true;
@@ -195,23 +195,41 @@ struct ans_packed_model {
                 if (is_compact_model(enc_model_offset)) {
                     auto enc_model_ptr = reinterpret_cast<const ans_packed::enc_model_compact*>(enc_models_u8.data() + enc_model_offset);
                     const ans_packed::enc_model_compact& enc_model = *enc_model_ptr;
-                    size_t model_size = dec_models_u8.size();
-                    create_dec_model_compact(dec_models_u8, enc_model);
-                    model_size = dec_models_u8.size() - model_size;
-                    std::cout << "CREATE_COMPACT_DEC_MODEL(" << i << ") bytes = " << model_size << std::endl;
-                    auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
-                    *model_offset_u64_ptr = set_compact_model(dec_model_offset);
+
+                    if (enc_model.M >= ans_packed::constants::COMPACT_DECMODEL_THRESHOLD) {
+                        size_t model_size = dec_models_u8.size();
+                        create_dec_model_compact_from_compact(dec_models_u8, enc_model);
+                        model_size = dec_models_u8.size() - model_size;
+                        // std::cout << "CREATE_COMPACT_DEC_MODEL(" << i << ") bytes = " << model_size << std::endl;
+                        auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
+                        *model_offset_u64_ptr = set_compact_model(dec_model_offset);
+                    } else {
+                        size_t model_size = dec_models_u8.size();
+                        create_dec_model_from_compact(dec_models_u8, enc_model);
+                        model_size = dec_models_u8.size() - model_size;
+                        // std::cout << "CREATE_DEC_MODEL(" << i << ") bytes = " << model_size << std::endl;
+                        auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
+                        *model_offset_u64_ptr = dec_model_offset;
+                    }
                 } else {
                     auto enc_model_ptr = reinterpret_cast<const ans_packed::enc_model*>(enc_models_u8.data() + enc_model_offset);
                     const ans_packed::enc_model& enc_model = *enc_model_ptr;
-                    size_t model_size = dec_models_u8.size();
-                    create_dec_model(dec_models_u8, enc_model);
-                    model_size = dec_models_u8.size() - model_size;
-                    std::cout << "CREATE_DEC_MODEL(" << i << ") bytes = " << model_size << std::endl;
-                    auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
-                    *model_offset_u64_ptr = dec_model_offset;
+                    if (enc_model.M >= ans_packed::constants::COMPACT_DECMODEL_THRESHOLD) {
+                        size_t model_size = dec_models_u8.size();
+                        create_dec_model_compact_from_full(dec_models_u8, enc_model);
+                        model_size = dec_models_u8.size() - model_size;
+                        // std::cout << "CREATE_COMPACT_DEC_MODEL(" << i << ") bytes = " << model_size << std::endl;
+                        auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
+                        *model_offset_u64_ptr = set_compact_model(dec_model_offset);
+                    } else {
+                        size_t model_size = dec_models_u8.size();
+                        create_dec_model_from_full(dec_models_u8, enc_model);
+                        model_size = dec_models_u8.size() - model_size;
+                        // std::cout << "CREATE_DEC_MODEL(" << i << ") bytes = " << model_size << std::endl;
+                        auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
+                        *model_offset_u64_ptr = dec_model_offset;
+                    }
                 }
-
             } else {
                 auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
                 *model_offset_u64_ptr = 0;
@@ -220,7 +238,8 @@ struct ans_packed_model {
         return dec_models_u8;
     }
 
-    static void model(std::vector<uint8_t>& cntsu8, uint32_t const* in, uint32_t /*sum_of_values*/, size_t n)
+    static void
+    model(std::vector<uint8_t>& cntsu8, uint32_t const* in, uint32_t /*sum_of_values*/, size_t n)
     {
         auto counts_ptr = reinterpret_cast<ans_packed_counts*>(cntsu8.data());
         auto& counts = *counts_ptr;

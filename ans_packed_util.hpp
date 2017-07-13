@@ -24,7 +24,8 @@ namespace constants {
     const uint8_t OUTPUT_BASE_LOG2 = 32;
     const uint64_t OUTPUT_BASE = 1ULL << OUTPUT_BASE_LOG2;
     const uint64_t NORM_LOWER_BOUND = 1ULL << 24;
-    const uint64_t COMPACT_MODEL_THRESHOLD = 1ULL << 8;
+    const uint64_t COMPACT_ENCMODEL_THRESHOLD = 1ULL << 16;
+    const uint64_t COMPACT_DECMODEL_THRESHOLD = 1ULL << 16;
 }
 
 struct mag_enc_table_entry {
@@ -45,6 +46,8 @@ struct enc_model {
     uint64_t mask_M = 0;
     uint64_t norm_lower_bound = 0;
     uint32_t max_value = 0;
+    uint64_t nfreq[constants::MAX_MAG + 1];
+    uint64_t base[constants::MAX_MAG + 1];
     mag_enc_table_entry table[0];
 };
 
@@ -534,6 +537,19 @@ static bool create_enc_model(std::vector<uint8_t>& enc_models, const ans_packed:
         }
     }
 
+    {
+        uint64_t cumsum2 = 0;
+        for (size_t i = 0; i <= ans_packed::constants::MAX_MAG; i++) {
+            model.nfreq[i] = norm_counts->counts[i];
+            if (norm_counts->counts[i] == 0)
+                continue;
+            auto min_val = ans_packed::min_val_in_mag(i);
+            auto max_val = ans_packed::max_val_in_mag(i, norm_counts->max_value);
+            model.base[i] = cumsum2;
+            cumsum2 += (max_val - min_val + 1) * model.nfreq[i];
+        }
+    }
+
     model.M = cumsum;
     model.norm_lower_bound = ans_packed::constants::NORM_LOWER_BOUND;
     if (model.norm_lower_bound < model.M)
@@ -605,7 +621,7 @@ static bool create_enc_model_compact(std::vector<uint8_t>& enc_models, const ans
     return false;
 }
 
-static void create_dec_model(std::vector<uint8_t>& dec_models, const ans_packed::enc_model& enc_model)
+static void create_dec_model_from_full(std::vector<uint8_t>& dec_models, const ans_packed::enc_model& enc_model)
 {
     // (1) determine model size
     size_t model_size = sizeof(ans_packed::dec_model) + (enc_model.M) * sizeof(ans_packed::mag_dec_table_entry);
@@ -631,7 +647,65 @@ static void create_dec_model(std::vector<uint8_t>& dec_models, const ans_packed:
     dec_models.insert(dec_models.end(), new_model.begin(), new_model.end());
 }
 
-static void create_dec_model_compact(std::vector<uint8_t>& dec_models, const ans_packed::enc_model_compact& enc_model)
+static void create_dec_model_from_compact(std::vector<uint8_t>& dec_models, const ans_packed::enc_model_compact& enc_model)
+{
+    // (1) determine model size
+    size_t model_size = sizeof(ans_packed::dec_model) + (enc_model.M) * sizeof(ans_packed::mag_dec_table_entry);
+    std::vector<uint8_t> new_model(model_size);
+    auto model_ptr = reinterpret_cast<ans_packed::dec_model*>(new_model.data());
+    auto& model = *model_ptr;
+
+    // (2) create csum table for decoding
+    model.M = enc_model.M;
+    model.mask_M = model.M - 1;
+    model.log2_M = log2(model.M);
+    model.norm_lower_bound = enc_model.norm_lower_bound;
+    size_t base = 0;
+    for (size_t i = 0; i <= constants::MAX_MAG; i++) {
+        uint64_t cur_freq = enc_model.nfreq[i];
+        if (cur_freq != 0) {
+            auto min_val = ans_packed::min_val_in_mag(i);
+            auto max_val = ans_packed::max_val_in_mag(i, enc_model.max_value);
+            size_t num_values = max_val - min_val + 1;
+            for (size_t k = 0; k < num_values; k++) {
+                for (size_t j = 0; j < cur_freq; j++) {
+                    model.table[base + j].sym = k + min_val;
+                    model.table[base + j].freq = cur_freq;
+                    model.table[base + j].offset = j;
+                }
+                base += cur_freq;
+            }
+        }
+    }
+    dec_models.insert(dec_models.end(), new_model.begin(), new_model.end());
+}
+
+static void create_dec_model_compact_from_full(std::vector<uint8_t>& dec_models, const ans_packed::enc_model& enc_model)
+{
+    // (1) determine model size
+    size_t model_size = sizeof(ans_packed::dec_model_compact);
+    std::vector<uint8_t> new_model(model_size);
+    auto model_ptr = reinterpret_cast<ans_packed::dec_model_compact*>(new_model.data());
+    auto& model = *model_ptr;
+
+    // (2) create csum table for decoding
+    model.M = enc_model.M;
+    model.mask_M = model.M - 1;
+    model.log2_M = log2(model.M);
+    model.norm_lower_bound = enc_model.norm_lower_bound;
+    size_t j = 0;
+    for (size_t i = 0; i <= constants::MAX_MAG; i++) {
+        model.nfreq[i] = enc_model.nfreq[i];
+        if (model.nfreq[i] != 0) {
+            model.base[j].value = enc_model.base[i];
+            model.base[j].mag = i;
+            j++;
+        }
+    }
+    dec_models.insert(dec_models.end(), new_model.begin(), new_model.end());
+}
+
+static void create_dec_model_compact_from_compact(std::vector<uint8_t>& dec_models, const ans_packed::enc_model_compact& enc_model)
 {
     // (1) determine model size
     size_t model_size = sizeof(ans_packed::dec_model_compact);
