@@ -50,6 +50,8 @@ public:
         {
             m_doc_enc_model = t_ansmodel::create_enc_model_from_counts(m_doc_counts);
             m_freq_enc_model = t_ansmodel::create_enc_model_from_counts(m_freq_counts);
+            std::cout << "doc_enc_model bytes = " << m_doc_enc_model.size() << std::endl;
+            std::cout << "freq_enc_model bytes = " << m_freq_enc_model.size() << std::endl;
         }
 
         void build(ans_block_freq_index& sq)
