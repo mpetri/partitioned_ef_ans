@@ -24,7 +24,7 @@ namespace constants {
     const uint8_t OUTPUT_BASE_LOG2 = 32;
     const uint64_t OUTPUT_BASE = 1ULL << OUTPUT_BASE_LOG2;
     const uint64_t NORM_LOWER_BOUND = 1ULL << 24;
-    const uint64_t COMPACT_MODEL_THRESHOLD = 1ULL << 16;
+    const uint64_t COMPACT_MODEL_THRESHOLD = 1ULL << 8;
 }
 
 struct mag_enc_table_entry {
@@ -128,13 +128,18 @@ struct dec_model {
     mag_dec_table_entry table[0];
 };
 
+struct dec_base {
+    uint64_t value;
+    uint64_t mag;
+};
+
 struct dec_model_compact {
     uint64_t M = 0; // frame size
     uint8_t log2_M = 0;
     uint64_t mask_M = 0;
     uint64_t norm_lower_bound = 0;
     uint64_t nfreq[constants::MAX_MAG + 1];
-    uint64_t base[constants::MAX_MAG + 1];
+    dec_base base[constants::MAX_MAG + 1];
 };
 
 uint8_t state_bytes(uint64_t state)
@@ -639,9 +644,14 @@ static void create_dec_model_compact(std::vector<uint8_t>& dec_models, const ans
     model.mask_M = model.M - 1;
     model.log2_M = log2(model.M);
     model.norm_lower_bound = enc_model.norm_lower_bound;
+    size_t j = 0;
     for (size_t i = 0; i <= constants::MAX_MAG; i++) {
         model.nfreq[i] = enc_model.nfreq[i];
-        model.base[i] = enc_model.base[i];
+        if (model.nfreq[i] != 0) {
+            model.base[j].value = enc_model.base[i];
+            model.base[j].mag = i;
+            j++;
+        }
     }
     dec_models.insert(dec_models.end(), new_model.begin(), new_model.end());
 }
