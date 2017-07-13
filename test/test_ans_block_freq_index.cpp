@@ -120,6 +120,16 @@ void test_ans_block_freq_index_large()
 
 BOOST_AUTO_TEST_CASE(ans_packed_model_model_max_1d_small)
 {
+    test_ans_block_freq_index_small<quasi_succinct::ans_msb_model<model_max_1d>>();
+}
+
+BOOST_AUTO_TEST_CASE(ans_packed_model_model_max_1d_large)
+{
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<model_max_1d>>();
+}
+
+BOOST_AUTO_TEST_CASE(ans_packed_model_model_max_1d_small)
+{
     test_ans_block_freq_index_small<quasi_succinct::ans_packed_model<model_max_1d>>();
 }
 

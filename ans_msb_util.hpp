@@ -13,11 +13,13 @@
 namespace ans_msb {
 
 namespace constants {
-    const uint32_t MAX_VAL = 1024;
-    const uint32_t FRAME_SIZE = 1024 * 16;
-    const uint8_t OUTPUT_BASE_LOG2 = 32;
-    const uint64_t OUTPUT_BASE = 1ULL << OUTPUT_BASE_LOG2;
-    const uint64_t NORM_LOWER_BOUND = 1ULL << 24;
+    constexpr uint32_t MAX_VAL = 1024;
+    constexpr uint32_t M = MAX_VAL * 16;
+    constexpr uint32_t MASK_M = M - 1;
+    constexpr uint32_t LOG2_M = log2(M);
+    constexpr uint8_t OUTPUT_BASE_LOG2 = 32;
+    constexpr uint64_t OUTPUT_BASE = 1ULL << OUTPUT_BASE_LOG2;
+    constexpr uint64_t NORM_LOWER_BOUND = 1ULL << 24;
 }
 
 using counts = uint64_t[constants::MAX_VAL + 1];
@@ -44,6 +46,28 @@ uint16_t mapping(uint32_t x)
 {
     uint8_t lzb = 3 - (__builtin_clz(x - 1) >> 3);
     return (x >> (lzb << 3)) + (lzb << 8);
+}
+
+uint16_t mapping_and_exceptions(uint32_t x, uint8_t*& except_out)
+{
+    if (x <= 256)
+        return x;
+    if (x <= (1 << 16)) {
+        // one exception byte
+        *except_out++ = x & 0xFF;
+        return (x >> 8) + 256;
+    }
+    if (x <= (1 << 24)) {
+        // two exception byte
+        *except_out++ = (x >> 8) & 0xFF;
+        *except_out++ = x & 0xFF;
+        return (x >> 16) + 512;
+    }
+    // three exception byte
+    *except_out++ = (x >> 16) & 0xFF;
+    *except_out++ = (x >> 8) & 0xFF;
+    *except_out++ = x & 0xFF;
+    return (x >> 24) + 768;
 }
 
 uint16_t mapping_alistair(uint32_t x)
@@ -144,14 +168,14 @@ bool create_enc_model(std::vector<uint8_t>& enc_models, counts& cnts)
         cumsum += norm_counts[i];
     }
     for (size_t k = 0; k <= constants::MAX_VAL; k++) {
-        model[k].SUB = ((constants::NORM_LOWER_BOUND / constants::FRAME_SIZE) * ans_msb::constants::OUTPUT_BASE)
+        model[k].SUB = ((constants::NORM_LOWER_BOUND / constants::M) * ans_msb::constants::OUTPUT_BASE)
             * model[k].freq;
     }
     enc_models.insert(enc_models.end(), new_model.begin(), new_model.end());
     return false;
 }
 
-static void create_dec_model(std::vector<uint8_t>& dec_models, const ans_msb::enc_model& enc_model)
+void create_dec_model(std::vector<uint8_t>& dec_models, const ans_msb::enc_model& enc_model)
 {
     // (1) determine model size
     size_t model_size = sizeof(ans_msb::dec_model);
@@ -171,5 +195,34 @@ static void create_dec_model(std::vector<uint8_t>& dec_models, const ans_msb::en
         base += cur_freq;
     }
     dec_models.insert(dec_models.end(), new_model.begin(), new_model.end());
+}
+
+uint64_t encode_num(const enc_model* model, uint64_t state, uint32_t num, uint8_t*& out)
+{
+    const auto& entry = model->table[num];
+    uint32_t f = entry.freq;
+    uint64_t b = entry.base;
+
+    // (1) normalize
+    if (state >= entry.SUB) {
+        ans::output_unit<ans::constants::OUTPUT_BASE_LOG2>(out, state);
+    }
+
+    // (2) transform state
+    uint64_t next = ((state / f) * ans_msb::constants::M) + (state % f) + b;
+    return next;
+}
+
+uint32_t decode_num(const dec_model* model, uint64_t& state, const uint8_t*& in, size_t& enc_size)
+{
+    uint64_t state_mod_M = state & ans_msb::constants::MASK_M;
+    const auto& entry = model->table[state_mod_M];
+    uint32_t num = entry.sym;
+    uint32_t f = entry.freq;
+    state = f * (state >> ans_msb::constants::LOG2_M) + entry.offset;
+    if (enc_size && state < ans_msb::constants::NORM_LOWER_BOUND) {
+        ans::input_unit<ans::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
+    }
+    return num;
 }
 }

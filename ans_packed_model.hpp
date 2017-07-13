@@ -57,8 +57,8 @@ struct model_minmax_2d {
             min_val = std::min(min_val, in[i] + 1);
             max_val = std::max(max_val, in[i] + 1);
         }
-        uint8_t min_mag = ans_packed::magnitude(min_val);
-        uint8_t max_mag = ans_packed::magnitude(max_val);
+        uint8_t min_mag = ans::magnitude(min_val);
+        uint8_t max_mag = ans::magnitude(max_val);
         return (ans_packed::constants::MAG2SEL[max_mag] << 4) + ans_packed::constants::MAG2SEL[min_mag];
     }
 
@@ -124,7 +124,7 @@ namespace quasi_succinct {
 
 template <typename model_type>
 struct ans_packed_model {
-    static const uint64_t block_size = ans_packed::constants::BLOCK_SIZE;
+    static const uint64_t block_size = ans::constants::BLOCK_SIZE;
     static const uint32_t NUM_MODELS = model_type::NUM_MODELS;
     using ans_packed_counts = ans_packed::mag_table[NUM_MODELS];
 
@@ -266,7 +266,7 @@ struct ans_packed_model {
 
         // (1) normalize
         while (state >= SUB) {
-            ans_packed::output_unit<ans_packed::constants::OUTPUT_BASE_LOG2>(out, state);
+            ans::output_unit<ans::constants::OUTPUT_BASE_LOG2>(out, state);
         }
 
         // (2) transform state
@@ -283,22 +283,12 @@ struct ans_packed_model {
 
         // (1) normalize
         while (state >= entry.SUB) {
-            ans_packed::output_unit<ans_packed::constants::OUTPUT_BASE_LOG2>(out, state);
+            ans::output_unit<ans::constants::OUTPUT_BASE_LOG2>(out, state);
         }
 
         // (2) transform state
         uint64_t next = ((state / f) * model->M) + (state % f) + b;
         return next;
-    }
-
-    static void flush_state(uint64_t state, uint8_t*& out, size_t num_bytes)
-    {
-        for (size_t i = 0; i < num_bytes; i++) {
-            uint8_t out_byte = state & 0xFF;
-            out--;
-            *out = out_byte;
-            state >>= 8;
-        }
     }
 
     static void encode(uint32_t const* in, uint32_t /*sum_of_values*/,
@@ -339,12 +329,12 @@ struct ans_packed_model {
         size_t u32s_written = enc_size / sizeof(uint32_t);
 
         // (3) write block header
-        bh.final_state_bytes = ans_packed::state_bytes(state);
+        bh.final_state_bytes = ans::state_bytes(state);
         bh.num_ans_u32s = u32s_written;
         model_type::write_block_header(bh, out);
 
         // (4) write the final state
-        flush_state(state, out_ptr, bh.final_state_bytes);
+        ans::flush_state(state, out_ptr, bh.final_state_bytes);
 
         // (5) copy the ans output to the buffer
         size_t final_enc_size = out_start - out_ptr;
@@ -372,7 +362,7 @@ struct ans_packed_model {
         uint32_t num = ans_packed::min_val_in_mag(state_mag) + num_offset;
         state = freq * (state >> model->log2_M) + offset;
         while (enc_size && state < model->norm_lower_bound) {
-            ans_packed::input_unit<ans_packed::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
+            ans::input_unit<ans::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
         }
 
         return num;
@@ -386,21 +376,10 @@ struct ans_packed_model {
         uint32_t f = entry.freq;
         state = f * (state >> model->log2_M) + entry.offset;
         while (enc_size && state < model->norm_lower_bound) {
-            ans_packed::input_unit<ans_packed::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
+            ans::input_unit<ans::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
         }
 
         return num;
-    }
-
-    static uint64_t init_decoder_state(const uint8_t*& in, uint8_t num_bytes)
-    {
-        uint64_t state = 0;
-        for (size_t i = 0; i < num_bytes; i++) {
-            uint8_t new_byte = *in++;
-            state <<= 8;
-            state = state + new_byte;
-        }
-        return state;
     }
 
     static uint8_t const*
@@ -421,7 +400,7 @@ struct ans_packed_model {
         auto model_ptrs = reinterpret_cast<const uint64_t*>(dec_model_u8);
         size_t model_offset = model_ptrs[bh.model_id];
 
-        uint64_t state = init_decoder_state(in, bh.final_state_bytes);
+        uint64_t state = ans::init_decoder(in, bh.final_state_bytes);
 
         if (is_compact_model(model_offset)) {
             auto cur_model = reinterpret_cast<const ans_packed::dec_model_compact*>(dec_model_u8 + model_offset);

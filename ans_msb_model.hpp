@@ -115,13 +115,102 @@ struct ans_msb_model {
     static void encode(uint32_t const* in, uint32_t /*sum_of_values*/,
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
+        // (1) determine and encode model id
+        block_header bh;
+        bh.model_id = model_type::pick_model(in, n);
+
+        if (bh.model_id == 0) { // all 1s. continue
+            model_type::write_block_header(bh, out);
+            return;
+        }
+
+        static std::array<uint8_t, block_size * 8> tmp_out_buf;
+        static std::array<uint8_t, block_size * 8> exception_out_buf;
+
+        // (2) reverse encode the block using the selected ANS model
+        auto model_ptrs = reinterpret_cast<const uint64_t*>(enc_model_u8.data());
+        size_t model_offset = model_ptrs[bh.model_id];
+        uint64_t state = 0;
+        auto out_ptr = tmp_out_buf.data() + tmp_out_buf.size() - 1;
+        auto except_ptr = exception_out_buf.data();
+        auto out_start = out_ptr;
+        auto except_start = except_ptr;
+        auto cur_model = reinterpret_cast<const ans_msb::enc_model*>(enc_model_u8.data() + model_offset);
+        for (size_t k = 0; k < n; k++) {
+            uint32_t num = in[n - k - 1];
+            uint32_t mapped_num = ans_msb::mapping_and_exceptions(num, except_ptr);
+            state = ans_msb::encode_num(cur_model, state, mapped_num, out_ptr);
+        }
+        size_t enc_size = out_start - out_ptr;
+        size_t u32s_written = enc_size / sizeof(uint32_t);
+
+        // (3) write block header
+        bh.final_state_bytes = ans::state_bytes(state);
+        bh.num_ans_u32s = u32s_written;
+        model_type::write_block_header(bh, out);
+
+        // (4) write the final state
+        ans::flush_state(state, out_ptr, bh.final_state_bytes);
+
+        // (5) copy the ans output to the buffer
+        size_t final_ans_size = out_start - out_ptr;
+        out.insert(out.end(), out_ptr, out_ptr + final_ans_size);
+        size_t final_except_size = except_ptr - except_start;
+        out.insert(out.end(), except_start, except_start + final_except_size);
     }
 
     static uint8_t const*
     decode(uint8_t const* in, uint32_t* out,
         uint32_t /* sum_of_values */, size_t n, uint8_t const* dec_model_u8)
     {
+        block_header bh;
+        model_type::read_block_header(bh, in);
 
+        // uniform block
+        if (bh.model_id == 0) {
+            for (size_t i = 0; i < n; i++)
+                out[i] = 0;
+            return in;
+        }
+
+        size_t enc_size = bh.num_ans_u32s * sizeof(uint32_t);
+        auto model_ptrs = reinterpret_cast<const uint64_t*>(dec_model_u8);
+        size_t model_offset = model_ptrs[bh.model_id];
+
+        // (0) init the decoder
+        uint64_t state = ans::init_decoder(in, bh.final_state_bytes);
+
+        // (1) decode the ans parts
+        auto cur_model = reinterpret_cast<const ans_msg::dec_model*>(dec_model_u8 + model_offset);
+        bool has_exceptions = false;
+        auto out_start = out;
+        for (size_t k = 0; k < n; k++) {
+            uint32_t dec_num = decode_num(cur_model, state, in, enc_size);
+            if (dec_num > 256)
+                has_exceptions = true;
+            *out++ = dec_num; // substract one as OT has 0s and our compactest num is 1
+        }
+
+        // (2) deal with exceptions
+        if (has_exceptions) {
+            for (size_t k = 0; k < n; k++) {
+                if (*out_start <= 256) {
+                    out_start++;
+                    continue;
+                }
+                if (*out_start > (1U << 8)) {
+                    *out_start = (*out_start << 8) + *in++;
+                }
+                if (*out_start > (1U << 16)) {
+                    *out_start = (*out_start << 8) + *in++;
+                }
+                if (*out_start > (1U << 24)) {
+                    *out_start = (*out_start << 8) + *in++;
+                }
+                out_start++;
+                continue;
+            }
+        }
         return in;
     }
 }

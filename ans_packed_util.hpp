@@ -21,8 +21,6 @@ namespace constants {
     const std::array<uint8_t, MAX_MAG + 1> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
         10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
     const uint64_t TOPFREQ = 1048576;
-    const uint8_t OUTPUT_BASE_LOG2 = 32;
-    const uint64_t OUTPUT_BASE = 1ULL << OUTPUT_BASE_LOG2;
     const uint64_t NORM_LOWER_BOUND = 1ULL << 24;
     const uint64_t COMPACT_ENCMODEL_THRESHOLD = 1ULL << 16;
     const uint64_t COMPACT_DECMODEL_THRESHOLD = 1ULL << 16;
@@ -145,25 +143,6 @@ struct dec_model_compact {
     dec_base base[constants::MAX_MAG + 1];
 };
 
-uint8_t state_bytes(uint64_t state)
-{
-    if (state < (1ULL << 8))
-        return 1;
-    if (state < (1ULL << 16))
-        return 2;
-    if (state < (1ULL << 24))
-        return 3;
-    if (state < (1ULL << 32))
-        return 4;
-    if (state < (1ULL << 40))
-        return 5;
-    if (state < (1ULL << 48))
-        return 6;
-    if (state < (1ULL << 56))
-        return 7;
-    return 8;
-}
-
 uint8_t pack_two_4bit_nums(uint8_t a, uint8_t b)
 {
     return (a << 4) + b;
@@ -172,86 +151,6 @@ uint8_t pack_two_4bit_nums(uint8_t a, uint8_t b)
 std::pair<uint8_t, uint8_t> unpack_two_4bit_nums(uint8_t x)
 {
     return { (x >> 4), (x & 15) };
-}
-
-template <uint8_t t_width>
-void output_unit(uint8_t*& out, uint64_t& state)
-{
-    static_assert(t_width % 8 == 0, "can only write byte-multiple units");
-    uint8_t w = t_width;
-    while (w) {
-        w -= 8;
-        --out;
-        *out = (uint8_t)(state & 0xFF);
-        state = state >> 8;
-    }
-}
-
-template <>
-void output_unit<8>(uint8_t*& out, uint64_t& state)
-{
-    --out;
-    *out = (uint8_t)(state & 0xFF);
-    state = state >> 8;
-}
-
-template <>
-void output_unit<16>(uint8_t*& out, uint64_t& state)
-{
-    out -= 2;
-    uint16_t* out16 = reinterpret_cast<uint16_t*>(out);
-    *out16 = (uint16_t)(state & 0xFFFF);
-    state = state >> 16;
-}
-
-template <>
-void output_unit<32>(uint8_t*& out, uint64_t& state)
-{
-    out -= 4;
-    uint32_t* out32 = reinterpret_cast<uint32_t*>(out);
-    *out32 = (uint32_t)(state & 0xFFFFFFFF);
-    state = state >> 32;
-}
-
-template <uint8_t t_width>
-void input_unit(const uint8_t*& in, uint64_t& state, std::size_t& enc_size)
-{
-    static_assert(t_width % 8 == 0, "can only read byte-multiple units");
-    uint8_t w = t_width;
-    while (w) {
-        uint8_t new_byte = *in++;
-        state = (state << t_width) | uint64_t(new_byte);
-        w -= 8;
-        enc_size--;
-    }
-}
-
-template <>
-void input_unit<8>(const uint8_t*& in, uint64_t& state, std::size_t& enc_size)
-{
-    uint8_t new_byte = *in++;
-    state = (state << 8) | uint64_t(new_byte);
-    enc_size--;
-}
-
-template <>
-void input_unit<16>(const uint8_t*& in, uint64_t& state, std::size_t& enc_size)
-{
-    const uint16_t* in16 = reinterpret_cast<const uint16_t*>(in);
-    uint64_t new_unit = *in16;
-    state = (state << 16) | new_unit;
-    in += 2;
-    enc_size -= 2;
-}
-
-template <>
-void input_unit<32>(const uint8_t*& in, uint64_t& state, std::size_t& enc_size)
-{
-    const uint32_t* in32 = reinterpret_cast<const uint32_t*>(in);
-    uint64_t new_unit = *in32;
-    state = (state << 32) | new_unit;
-    in += 4;
-    enc_size -= 4;
 }
 
 inline uint8_t vb_size(uint64_t x)
@@ -385,17 +284,6 @@ uint32_t uniq_vals_in_mag(uint8_t mag, uint32_t max_val = 0)
 {
     return max_val_in_mag(mag, max_val) - min_val_in_mag(mag) + 1;
 }
-
-uint64_t next_power_of_two(uint64_t x)
-{
-    if (x == 0) {
-        return 1;
-    }
-    uint32_t res = 63 - __builtin_clzll(x);
-    return (1ULL << (res + 1));
-}
-
-bool is_power_of_two(uint64_t x) { return ((x != 0) && !(x & (x - 1))); }
 
 static mag_table* normalize_counts(const mag_table* table)
 {
