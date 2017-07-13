@@ -134,53 +134,17 @@ struct ans_packed_model {
         return std::vector<uint8_t>(count_size, 0);
     }
 
-    static bool create_enc_model(std::vector<uint8_t>& enc_models, const ans_packed::mag_table& table)
+    static size_t set_compact_model(size_t model_offset)
     {
-        // (0) if all is 0 do nothing
-        if (std::all_of(table.counts, table.counts + ans_packed::constants::MAX_MAG + 1,
-                [](uint64_t i) { return i == 0; })) {
+        return model_offset | 0x8000000000000000ULL;
+    }
+
+    static bool is_compact_model(size_t& model_offset)
+    {
+        if (model_offset & 0x8000000000000000ULL) {
+            model_offset ^= 0x8000000000000000ULL;
             return true;
         }
-
-        // (1) normalize the counts
-        auto norm_counts = ans_packed::normalize_counts(&table);
-
-        // (2) create the encoding model
-        size_t model_size = sizeof(ans_packed::enc_model) + (table.max_value + 1) * sizeof(ans_packed::mag_enc_table_entry);
-        std::vector<uint8_t> new_model(model_size);
-        auto model_ptr = reinterpret_cast<ans_packed::enc_model*>(new_model.data());
-        auto& model = *model_ptr;
-
-        // (2a) fill the tables
-        uint64_t cumsum = 0;
-        for (size_t i = 0; i <= ans_packed::constants::MAX_MAG; i++) {
-            if (norm_counts->counts[i] == 0)
-                continue;
-            auto min_val = ans_packed::min_val_in_mag(i);
-            auto max_val = ans_packed::max_val_in_mag(i, norm_counts->max_value);
-            for (size_t j = min_val; j <= max_val; j++) {
-                model.table[j].freq = norm_counts->counts[i];
-                model.table[j].base = cumsum;
-                cumsum += model.table[j].freq;
-            }
-        }
-
-        model.M = cumsum;
-        model.norm_lower_bound = ans_packed::constants::NORM_LOWER_BOUND;
-        if (model.norm_lower_bound < model.M)
-            model.norm_lower_bound = model.M;
-        for (size_t j = 1; j < (norm_counts->max_value + 1); j++) {
-            model.table[j].SUB = ((model.norm_lower_bound / model.M) * ans_packed::constants::OUTPUT_BASE)
-                * model.table[j].freq;
-        }
-        model.mask_M = model.M - 1;
-        model.log2_M = log2(model.M);
-        model.max_value = norm_counts->max_value;
-
-        print_enc_model(&model);
-
-        enc_models.insert(enc_models.end(), new_model.begin(), new_model.end());
-        delete norm_counts;
         return false;
     }
 
@@ -195,44 +159,29 @@ struct ans_packed_model {
             // (1) store offset of model data in byte stream
             size_t model_offset = enc_models.size();
             // (2) create the model
-            bool empty_model = create_enc_model(enc_models, counts[i]);
+
+            bool empty_model = false;
+            bool compact_model = false;
+            if (counts[i].max_value < ans_packed::constants::COMPACT_MODEL_THRESHOLD) {
+                empty_model = create_enc_model(enc_models, counts[i]);
+            } else {
+                compact_model = true;
+                empty_model = create_enc_model_compact(enc_models, counts[i]);
+            }
             auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(enc_models.data()) + i;
             if (empty_model) {
                 *model_offset_u64_ptr = 0;
             } else {
-                *model_offset_u64_ptr = model_offset;
+                if (compact_model)
+                    *model_offset_u64_ptr = set_compact_model(model_offset);
+                else
+                    *model_offset_u64_ptr = model_offset;
             }
         }
         return enc_models;
     }
 
-    static void create_dec_model(std::vector<uint8_t>& dec_models, const ans_packed::enc_model& enc_model)
-    {
-        // (1) determine model size
-        size_t model_size = sizeof(ans_packed::dec_model) + (enc_model.M) * sizeof(ans_packed::mag_dec_table_entry);
-        std::vector<uint8_t> new_model(model_size);
-        auto model_ptr = reinterpret_cast<ans_packed::dec_model*>(new_model.data());
-        auto& model = *model_ptr;
-
-        // (2) create csum table for decoding
-        model.M = enc_model.M;
-        model.mask_M = model.M - 1;
-        model.log2_M = log2(model.M);
-        model.norm_lower_bound = enc_model.norm_lower_bound;
-        size_t base = 0;
-        for (size_t j = 1; j <= enc_model.max_value; j++) {
-            auto cur_freq = enc_model.table[j].freq;
-            for (size_t k = 0; k < cur_freq; k++) {
-                model.table[base + k].sym = j;
-                model.table[base + k].freq = cur_freq;
-                model.table[base + k].offset = k;
-            }
-            base += cur_freq;
-        }
-        dec_models.insert(dec_models.end(), new_model.begin(), new_model.end());
-    }
-
-    static std::vector<uint8_t> create_dec_model(const std::vector<uint8_t>& enc_models_u8)
+    static std::vector<uint8_t> create_dec_models(const std::vector<uint8_t>& enc_models_u8)
     {
         auto enc_models = reinterpret_cast<const uint64_t*>(enc_models_u8.data());
         size_t pointers_to_models = NUM_MODELS * sizeof(uint64_t);
@@ -242,11 +191,20 @@ struct ans_packed_model {
             size_t dec_model_offset = dec_models_u8.size();
             if (enc_models[i] != 0) {
                 size_t enc_model_offset = enc_models[i];
-                auto enc_model_ptr = reinterpret_cast<const ans_packed::enc_model*>(enc_models_u8.data() + enc_model_offset);
-                const ans_packed::enc_model& enc_model = *enc_model_ptr;
-                create_dec_model(dec_models_u8, enc_model);
-                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
-                *model_offset_u64_ptr = dec_model_offset;
+                if (is_compact_model(enc_model_offset)) {
+                    auto enc_model_ptr = reinterpret_cast<const ans_packed::enc_model_compact*>(enc_models_u8.data() + enc_model_offset);
+                    const ans_packed::enc_model_compact& enc_model = *enc_model_ptr;
+                    create_dec_model_compact(dec_models_u8, enc_model);
+                    auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
+                    *model_offset_u64_ptr = set_compact_model(dec_model_offset);
+                } else {
+                    auto enc_model_ptr = reinterpret_cast<const ans_packed::enc_model*>(enc_models_u8.data() + enc_model_offset);
+                    const ans_packed::enc_model& enc_model = *enc_model_ptr;
+                    create_dec_model(dec_models_u8, enc_model);
+                    auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
+                    *model_offset_u64_ptr = dec_model_offset;
+                }
+
             } else {
                 auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
                 *model_offset_u64_ptr = 0;
@@ -267,6 +225,27 @@ struct ans_packed_model {
             max_val = std::max(max_val, in[i] + 1);
         }
         counts[model_id].max_value = std::max(max_val, counts[model_id].max_value);
+    }
+
+    static uint64_t encode_num_compact(const ans_packed::enc_model_compact* model, uint64_t state,
+        uint32_t num, uint8_t*& out)
+    {
+        // (0) lookup quantities
+        uint8_t mag = ans_packed::magnitude(num);
+        uint64_t min_val = ans_packed::min_val_in_mag(mag);
+        uint64_t vals_before = num - min_val;
+        uint64_t freq = model->nfreq[mag];
+        uint64_t base = model->base[mag] + (freq * vals_before);
+        uint64_t SUB = model->SUB[mag];
+
+        // (1) normalize
+        while (state >= SUB) {
+            ans_packed::output_unit<ans_packed::constants::OUTPUT_BASE_LOG2>(out, state);
+        }
+
+        // (2) transform state
+        uint64_t next = ((state / freq) * model->M) + (state % freq) + base;
+        return next;
     }
 
     static uint64_t encode_num(const ans_packed::enc_model* model, uint64_t state,
@@ -313,14 +292,23 @@ struct ans_packed_model {
         // (2) reverse encode the block using the selected ANS model
         auto model_ptrs = reinterpret_cast<const uint64_t*>(enc_model_u8.data());
         size_t model_offset = model_ptrs[bh.model_id];
-        auto cur_model = reinterpret_cast<const ans_packed::enc_model*>(enc_model_u8.data() + model_offset);
         uint64_t state = 0;
         auto out_ptr = tmp_out_buf.data() + tmp_out_buf.size() - 1;
         auto out_start = out_ptr;
-        for (size_t k = 0; k < n; k++) {
-            uint32_t num = in[n - k - 1] + 1;
-            state = encode_num(cur_model, state, num, out_ptr);
+        if (is_compact_model(model_offset)) {
+            auto cur_model = reinterpret_cast<const ans_packed::enc_model_compact*>(enc_model_u8.data() + model_offset);
+            for (size_t k = 0; k < n; k++) {
+                uint32_t num = in[n - k - 1] + 1;
+                state = encode_num_compact(cur_model, state, num, out_ptr);
+            }
+        } else {
+            auto cur_model = reinterpret_cast<const ans_packed::enc_model*>(enc_model_u8.data() + model_offset);
+            for (size_t k = 0; k < n; k++) {
+                uint32_t num = in[n - k - 1] + 1;
+                state = encode_num(cur_model, state, num, out_ptr);
+            }
         }
+
         size_t enc_size = out_start - out_ptr;
         size_t u32s_written = enc_size / sizeof(uint32_t);
 
@@ -335,6 +323,30 @@ struct ans_packed_model {
         // (5) copy the ans output to the buffer
         size_t final_enc_size = out_start - out_ptr;
         out.insert(out.end(), out_ptr, out_ptr + final_enc_size);
+    }
+
+    static uint8_t find_mag(const ans_packed::dec_model_compact* model, uint64_t state_mod_M)
+    {
+        for (size_t i = 0; i <= ans_packed::constants::MAX_MAG; i++) {
+            if (model->base[i] > state_mod_M)
+                return i - 1;
+        }
+        return ans_packed::constants::MAX_MAG;
+    }
+
+    static uint32_t decode_num_compact(const ans_packed::dec_model_compact* model, uint64_t& state, const uint8_t*& in, size_t& enc_size)
+    {
+        uint64_t state_mod_M = state & model->mask_M;
+        uint8_t state_mag = find_mag(model, state_mod_M);
+        uint32_t freq = model->nfreq[state_mag];
+        uint64_t offset = state_mod_M - model->base[state_mag];
+        uint32_t num = ans_packed::min_val_in_mag(state_mag) + offset;
+        state = freq * (state >> model->log2_M) + offset;
+        while (enc_size && state < model->norm_lower_bound) {
+            ans_packed::input_unit<ans_packed::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
+        }
+
+        return num;
     }
 
     static uint32_t decode_num(const ans_packed::dec_model* model, uint64_t& state, const uint8_t*& in, size_t& enc_size)
@@ -379,13 +391,21 @@ struct ans_packed_model {
         size_t enc_size = bh.num_ans_u32s * sizeof(uint32_t);
         auto model_ptrs = reinterpret_cast<const uint64_t*>(dec_model_u8);
         size_t model_offset = model_ptrs[bh.model_id];
-        auto cur_model = reinterpret_cast<const ans_packed::dec_model*>(dec_model_u8 + model_offset);
 
         uint64_t state = init_decoder_state(in, bh.final_state_bytes);
 
-        for (size_t k = 0; k < n; k++) {
-            uint32_t dec_num = decode_num(cur_model, state, in, enc_size);
-            *out++ = dec_num - 1; // substract one as OT has 0s and our smallest num is 1
+        if (is_compact_model(model_offset)) {
+            auto cur_model = reinterpret_cast<const ans_packed::dec_model_compact*>(dec_model_u8 + model_offset);
+            for (size_t k = 0; k < n; k++) {
+                uint32_t dec_num = decode_num_compact(cur_model, state, in, enc_size);
+                *out++ = dec_num - 1; // substract one as OT has 0s and our compactest num is 1
+            }
+        } else {
+            auto cur_model = reinterpret_cast<const ans_packed::dec_model*>(dec_model_u8 + model_offset);
+            for (size_t k = 0; k < n; k++) {
+                uint32_t dec_num = decode_num(cur_model, state, in, enc_size);
+                *out++ = dec_num - 1; // substract one as OT has 0s and our compactest num is 1
+            }
         }
         return in;
     }

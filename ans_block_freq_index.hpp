@@ -60,12 +60,12 @@ public:
             sq.m_lists.steal(m_lists);
 
             {
-                auto doc_dec_tmp = t_ansmodel::create_dec_model(m_doc_enc_model);
+                auto doc_dec_tmp = t_ansmodel::create_dec_models(m_doc_enc_model);
                 m_doc_enc_model.clear();
                 sq.m_doc_dec_model.steal(doc_dec_tmp);
             }
             {
-                auto freq_dec_tmp = t_ansmodel::create_dec_model(m_freq_enc_model);
+                auto freq_dec_tmp = t_ansmodel::create_dec_models(m_freq_enc_model);
                 m_freq_enc_model.clear();
                 sq.m_freq_dec_model.steal(freq_dec_tmp);
             }
