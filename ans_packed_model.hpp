@@ -167,6 +167,7 @@ struct ans_packed_model {
             } else {
                 compact_model = true;
                 empty_model = create_enc_model_compact(enc_models, counts[i]);
+                std::cout << "CREATE_COMPACT_MODEL(" << i << ") max_value = " << counts[i].max_value << std::endl;
             }
             auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(enc_models.data()) + i;
             if (empty_model) {
@@ -195,6 +196,7 @@ struct ans_packed_model {
                     auto enc_model_ptr = reinterpret_cast<const ans_packed::enc_model_compact*>(enc_models_u8.data() + enc_model_offset);
                     const ans_packed::enc_model_compact& enc_model = *enc_model_ptr;
                     create_dec_model_compact(dec_models_u8, enc_model);
+                    std::cout << "CREATE_COMPACT_DEC_MODEL(" << i << ")" << std::endl;
                     auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
                     *model_offset_u64_ptr = set_compact_model(dec_model_offset);
                 } else {
@@ -327,9 +329,16 @@ struct ans_packed_model {
 
     static uint8_t find_mag(const ans_packed::dec_model_compact* model, uint64_t state_mod_M)
     {
-        for (size_t i = 0; i <= ans_packed::constants::MAX_MAG; i++) {
-            if (model->base[i] > state_mod_M)
-                return i - 1;
+
+        size_t i = 0;
+        for (; i <= ans_packed::constants::MAX_MAG && model->base[i] == 0; i++) {
+        }
+        size_t last_change = i - 1;
+        for (; i <= ans_packed::constants::MAX_MAG; i++) {
+            if (model->base[i] > state_mod_M || model->base[i] == 0)
+                return last_change;
+            if (model->base[i] != model->base[last_change])
+                last_change = i;
         }
         return ans_packed::constants::MAX_MAG;
     }
@@ -339,8 +348,10 @@ struct ans_packed_model {
         uint64_t state_mod_M = state & model->mask_M;
         uint8_t state_mag = find_mag(model, state_mod_M);
         uint32_t freq = model->nfreq[state_mag];
-        uint64_t offset = state_mod_M - model->base[state_mag];
-        uint32_t num = ans_packed::min_val_in_mag(state_mag) + offset;
+        uint64_t mag_offset = (state_mod_M - model->base[state_mag]);
+        uint64_t offset = mag_offset % freq;
+        uint64_t num_offset = mag_offset / freq;
+        uint32_t num = ans_packed::min_val_in_mag(state_mag) + num_offset;
         state = freq * (state >> model->log2_M) + offset;
         while (enc_size && state < model->norm_lower_bound) {
             ans_packed::input_unit<ans_packed::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);

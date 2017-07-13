@@ -8,6 +8,8 @@
 #include <utility>
 #include <vector>
 
+//#define ANS_DEBUG 1
+
 namespace ans_packed {
 
 namespace constants {
@@ -83,17 +85,17 @@ void print_enc_model_compact(const enc_model_compact* m)
               << " max_value = " << (int)m->max_value << "\n";
     std::cout << "FREQ = [";
     for (size_t i = 0; i < constants::MAX_MAG; i++) {
-        std::cout << m->nfreq[i];
+        std::cout << m->nfreq[i] << ",";
     }
     std::cout << "]\n";
     std::cout << "BASE = [";
     for (size_t i = 0; i < constants::MAX_MAG; i++) {
-        std::cout << m->base[i];
+        std::cout << m->base[i] << ",";
     }
     std::cout << "]\n";
     std::cout << "SUB = [";
     for (size_t i = 0; i < constants::MAX_MAG; i++) {
-        std::cout << m->SUB[i];
+        std::cout << m->SUB[i] << ",";
     }
     std::cout << "]\n";
 }
@@ -400,7 +402,9 @@ bool is_power_of_two(uint64_t x) { return ((x != 0) && !(x & (x - 1))); }
 
 static mag_table* normalize_counts(const mag_table* table)
 {
+#ifdef ANS_DEBUG
     print_mag_table(table, "initial_freqs");
+#endif
     mag_table* nfreqs = new mag_table;
     nfreqs->max_value = table->max_value;
     uint64_t initial_sum = 0;
@@ -448,8 +452,9 @@ static mag_table* normalize_counts(const mag_table* table)
             }
         }
     }
+#ifdef ANS_DEBUG
     print_mag_table(nfreqs, "second_phase");
-
+#endif
     /* now, what does it all add up to? */
     uint64_t M = 0;
     for (size_t m = min_mag; m <= max_mag; m++) {
@@ -477,8 +482,9 @@ static mag_table* normalize_counts(const mag_table* table)
         }
         nfreqs->counts[0] += excess;
     }
+#ifdef ANS_DEBUG
     print_mag_table(nfreqs, "final_phase");
-
+#endif
     M = 0;
     for (size_t i = 0; i <= max_mag; i++) {
         M += int64_t(nfreqs->counts[i] * uniq_vals_in_mag(i, nfreqs->max_value));
@@ -535,7 +541,9 @@ static bool create_enc_model(std::vector<uint8_t>& enc_models, const ans_packed:
     model.log2_M = log2(model.M);
     model.max_value = norm_counts->max_value;
 
+#ifdef ANS_DEBUG
     print_enc_model(&model);
+#endif
 
     enc_models.insert(enc_models.end(), new_model.begin(), new_model.end());
     delete norm_counts;
@@ -583,7 +591,9 @@ static bool create_enc_model_compact(std::vector<uint8_t>& enc_models, const ans
     model.log2_M = log2(model.M);
     model.max_value = norm_counts->max_value;
 
+#ifdef ANS_DEBUG
     print_enc_model_compact(&model);
+#endif
 
     enc_models.insert(enc_models.end(), new_model.begin(), new_model.end());
     delete norm_counts;
