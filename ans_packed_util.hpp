@@ -364,17 +364,6 @@ inline void vbyte_encode_u64(uint8_t*& out, uint64_t x)
     }
 }
 
-uint8_t magnitude(uint32_t x)
-{
-    uint64_t y = x;
-    if (x == 1)
-        return 0;
-    uint32_t res = 63 - __builtin_clzll(y);
-    if ((1ULL << res) == y)
-        return res;
-    return res + 1;
-}
-
 uint32_t max_val_in_mag(uint8_t mag, uint32_t max_val = 0)
 {
     uint32_t maxv = 1;
