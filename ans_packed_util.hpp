@@ -8,6 +8,8 @@
 #include <utility>
 #include <vector>
 
+#include "ans_util.hpp"
+
 //#define ANS_DEBUG 1
 
 namespace ans_packed {
@@ -142,16 +144,6 @@ struct dec_model_compact {
     uint64_t nfreq[constants::MAX_MAG + 1];
     dec_base base[constants::MAX_MAG + 1];
 };
-
-uint8_t pack_two_4bit_nums(uint8_t a, uint8_t b)
-{
-    return (a << 4) + b;
-}
-
-std::pair<uint8_t, uint8_t> unpack_two_4bit_nums(uint8_t x)
-{
-    return { (x >> 4), (x & 15) };
-}
 
 inline uint8_t vb_size(uint64_t x)
 {
@@ -346,7 +338,7 @@ static mag_table* normalize_counts(const mag_table* table)
         M += nfreqs->counts[m] * uniq_vals_in_mag(m, nfreqs->max_value);
     }
     /* fourth phase, round up to a power of two and then redistribute */
-    uint64_t target_power = next_power_of_two(M);
+    uint64_t target_power = ans::next_power_of_two(M);
     uint64_t excess = target_power - M;
     /* flow that excess count backwards to the beginning of
            the selectors array, spreading it out across the buckets...
@@ -375,7 +367,7 @@ static mag_table* normalize_counts(const mag_table* table)
         M += int64_t(nfreqs->counts[i] * uniq_vals_in_mag(i, nfreqs->max_value));
     }
 
-    if (!is_power_of_two(M)) {
+    if (!ans::is_power_of_two(M)) {
         fprintf(stderr, "ERROR! not power of 2 after normalization = %lu\n", M);
         exit(EXIT_FAILURE);
     }
@@ -432,7 +424,7 @@ static bool create_enc_model(std::vector<uint8_t>& enc_models, const ans_packed:
     if (model.norm_lower_bound < model.M)
         model.norm_lower_bound = model.M;
     for (size_t j = 1; j < (norm_counts->max_value + 1); j++) {
-        model.table[j].SUB = ((model.norm_lower_bound / model.M) * ans_packed::constants::OUTPUT_BASE)
+        model.table[j].SUB = ((model.norm_lower_bound / model.M) * ans::constants::OUTPUT_BASE)
             * model.table[j].freq;
     }
     model.mask_M = model.M - 1;
@@ -482,7 +474,7 @@ static bool create_enc_model_compact(std::vector<uint8_t>& enc_models, const ans
     if (model.norm_lower_bound < model.M)
         model.norm_lower_bound = model.M;
     for (size_t i = 0; i <= ans_packed::constants::MAX_MAG; i++) {
-        model.SUB[i] = ((model.norm_lower_bound / model.M) * ans_packed::constants::OUTPUT_BASE)
+        model.SUB[i] = ((model.norm_lower_bound / model.M) * ans::constants::OUTPUT_BASE)
             * model.nfreq[i];
     }
     model.mask_M = model.M - 1;

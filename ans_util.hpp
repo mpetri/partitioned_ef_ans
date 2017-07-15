@@ -135,6 +135,16 @@ void input_unit<32>(const uint8_t*& in, uint64_t& state, std::size_t& enc_size)
 
 uint8_t state_bytes(uint64_t state)
 {
-    return 1 + (__builtin_clzll(state) >> 3);
+    return 8 - (__builtin_clzll(state) >> 3);
+}
+
+uint8_t pack_two_4bit_nums(uint8_t a, uint8_t b)
+{
+    return (a << 4) + b;
+}
+
+std::pair<uint8_t, uint8_t> unpack_two_4bit_nums(uint8_t x)
+{
+    return { (x >> 4), (x & 15) };
 }
 }

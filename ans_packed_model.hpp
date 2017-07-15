@@ -22,13 +22,13 @@ struct model_max_1d {
         for (size_t i = 0; i < n; i++) {
             max_val = std::max(max_val, in[i] + 1);
         }
-        uint8_t max_mag = ans_packed::magnitude(max_val);
+        uint8_t max_mag = ans::magnitude(max_val);
         return ans_packed::constants::MAG2SEL[max_mag];
     }
 
     static void write_block_header(const block_header& bh, std::vector<uint8_t>& out)
     {
-        uint8_t packed = ans_packed::pack_two_4bit_nums(bh.model_id, bh.final_state_bytes);
+        uint8_t packed = ans::pack_two_4bit_nums(bh.model_id, bh.final_state_bytes);
         out.push_back(packed);
         if (bh.model_id != 0) {
             out.push_back(uint8_t(bh.num_ans_u32s));
@@ -38,7 +38,7 @@ struct model_max_1d {
     static void read_block_header(block_header& bh, uint8_t const*& in)
     {
         uint8_t packed = *in++;
-        auto model_and_fsb = ans_packed::unpack_two_4bit_nums(packed);
+        auto model_and_fsb = ans::unpack_two_4bit_nums(packed);
         bh.model_id = model_and_fsb.first;
         bh.final_state_bytes = model_and_fsb.second;
         if (bh.model_id != 0) {
@@ -90,8 +90,8 @@ struct model_med90p_2d {
         std::sort(tmp.begin(), tmp.begin() + n);
         uint32_t val_med = tmp[n / 2] + 1;
         uint32_t val_90p = tmp[0.9 * n] + 1;
-        uint8_t mag_med = ans_packed::magnitude(val_med);
-        uint8_t mag_90p = ans_packed::magnitude(val_90p);
+        uint8_t mag_med = ans::magnitude(val_med);
+        uint8_t mag_90p = ans::magnitude(val_90p);
         if (tmp[n - 1] + 1 == 1) {
             return 0;
         }
@@ -246,7 +246,7 @@ struct ans_packed_model {
         auto model_id = model_type::pick_model(in, n);
         uint32_t max_val = 0;
         for (size_t i = 0; i < n; i++) {
-            uint8_t mag = ans_packed::magnitude(in[i] + 1);
+            uint8_t mag = ans::magnitude(in[i] + 1);
             counts[model_id].counts[mag]++;
             max_val = std::max(max_val, in[i] + 1);
         }
@@ -257,7 +257,7 @@ struct ans_packed_model {
         uint32_t num, uint8_t*& out)
     {
         // (0) lookup quantities
-        uint8_t mag = ans_packed::magnitude(num);
+        uint8_t mag = ans::magnitude(num);
         uint64_t min_val = ans_packed::min_val_in_mag(mag);
         uint64_t vals_before = num - min_val;
         uint64_t freq = model->nfreq[mag];

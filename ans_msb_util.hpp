@@ -8,6 +8,8 @@
 #include <utility>
 #include <vector>
 
+#include "ans_util.hpp"
+
 //#define ANS_DEBUG 1
 
 namespace ans_msb {
@@ -31,21 +33,54 @@ struct enc_table_entry {
     uint64_t SUB;
 };
 
-using enc_model = enc_table_entry[constants::MAX_VAL];
+using enc_model = enc_table_entry[constants::MAX_VAL + 1];
 
 #pragma pack(1)
 struct dec_table_entry {
-    uint64_t freq;
-    uint64_t base;
-    uint64_t SUB;
+    uint16_t freq;
+    uint16_t except_bytes;
+    uint64_t offset;
+    uint32_t mapped_num;
+    uint64_t except_mask;
 };
 
-using dec_model = dec_table_entry[constants::FRAME_SIZE];
+using dec_model = dec_table_entry[constants::M];
 
 uint16_t mapping(uint32_t x)
 {
     uint8_t lzb = 3 - (__builtin_clz(x - 1) >> 3);
     return (x >> (lzb << 3)) + (lzb << 8);
+}
+
+uint32_t undo_mapping(uint32_t x)
+{
+    if (x <= 256)
+        return x;
+    if (x <= 512)
+        return ((x - 256) << 8);
+    if (x <= 768)
+        return ((x - 512) << 16);
+    return ((x - 768) << 24);
+}
+
+uint32_t exception_bytes(uint32_t x)
+{
+    if (x <= 256)
+        return 0;
+    if (x <= 512)
+        return 1;
+    if (x <= 768)
+        return 2;
+    return 3;
+}
+
+uint32_t undo_mapping(const dec_table_entry& entry, const uint8_t*& except_ptr)
+{
+    auto except_u32 = reinterpret_cast<const uint32_t*>(except_ptr);
+    uint64_t except_u64 = (*except_u32);
+    uint32_t num = entry.mapped_num + (except_u64 & entry.except_mask);
+    except_ptr += entry.except_bytes;
+    return num;
 }
 
 uint16_t mapping_and_exceptions(uint32_t x, uint8_t*& except_out)
@@ -54,19 +89,20 @@ uint16_t mapping_and_exceptions(uint32_t x, uint8_t*& except_out)
         return x;
     if (x <= (1 << 16)) {
         // one exception byte
-        *except_out++ = x & 0xFF;
+        // std::cout << "x = " << x << " exception byte = " << (x & 0xFF) << std::endl;
+        *except_out-- = x & 0xFF;
         return (x >> 8) + 256;
     }
     if (x <= (1 << 24)) {
         // two exception byte
-        *except_out++ = (x >> 8) & 0xFF;
-        *except_out++ = x & 0xFF;
+        *except_out-- = (x >> 8) & 0xFF;
+        *except_out-- = x & 0xFF;
         return (x >> 16) + 512;
     }
     // three exception byte
-    *except_out++ = (x >> 16) & 0xFF;
-    *except_out++ = (x >> 8) & 0xFF;
-    *except_out++ = x & 0xFF;
+    *except_out-- = (x >> 16) & 0xFF;
+    *except_out-- = (x >> 8) & 0xFF;
+    *except_out-- = x & 0xFF;
     return (x >> 24) + 768;
 }
 
@@ -131,14 +167,15 @@ std::vector<uint64_t> normalize_freqs(const counts& freqs, size_t target_power)
     for (size_t i = 0; i < n; i++) {
         M += nfreqs[i];
     }
-    if (!is_power_of_two(M)) {
-        quit("ERROR! not power of 2 after normalization = %lu", M);
+    if (!ans::is_power_of_two(M)) {
+        fprintf(stderr, "ERROR! not power of 2 after normalization = %lu", M);
+        exit(EXIT_FAILURE);
     }
 
     return nfreqs;
 }
 
-bool create_enc_model(std::vector<uint8_t>& enc_models, counts& cnts)
+bool create_enc_model(std::vector<uint8_t>& enc_models, const counts& cnts)
 {
     // (0) if all is 0 do nothing
     if (std::all_of(cnts, cnts + constants::MAX_VAL + 1,
@@ -147,7 +184,7 @@ bool create_enc_model(std::vector<uint8_t>& enc_models, counts& cnts)
     }
 
     // (1) normalize the counts
-    auto norm_counts = ans_msb::normalize_freqs(cnts, constants::FRAME_SIZE);
+    auto norm_counts = ans_msb::normalize_freqs(cnts, constants::M);
 
     // (2) create the encoding model
     size_t model_size = sizeof(ans_msb::enc_model);
@@ -156,20 +193,15 @@ bool create_enc_model(std::vector<uint8_t>& enc_models, counts& cnts)
     auto& model = *model_ptr;
 
     // (2a) fill the tables
-    uint64_t cumsum = 0;
-    uint64_t j = 0;
+    uint64_t base = 0;
     for (size_t i = 0; i <= constants::MAX_VAL; i++) {
-        if (norm_counts[i] == 0)
-            continue;
-        for (size_t j = 0; j < norm_counts[i]; j++) {
-            model[j].freq = norm_counts[i];
-            model[j].base = cumsum;
-        }
-        cumsum += norm_counts[i];
+        model[i].freq = norm_counts[i];
+        model[i].base = base;
+        base += norm_counts[i];
     }
+    const uint64_t tmp = ((constants::NORM_LOWER_BOUND / constants::M) * ans_msb::constants::OUTPUT_BASE);
     for (size_t k = 0; k <= constants::MAX_VAL; k++) {
-        model[k].SUB = ((constants::NORM_LOWER_BOUND / constants::M) * ans_msb::constants::OUTPUT_BASE)
-            * model[k].freq;
+        model[k].SUB = tmp * model[k].freq;
     }
     enc_models.insert(enc_models.end(), new_model.begin(), new_model.end());
     return false;
@@ -188,7 +220,9 @@ void create_dec_model(std::vector<uint8_t>& dec_models, const ans_msb::enc_model
     for (size_t j = 0; j <= constants::MAX_VAL; j++) {
         auto cur_freq = enc_model[j].freq;
         for (size_t k = 0; k < cur_freq; k++) {
-            model[base + k].sym = j;
+            model[base + k].mapped_num = undo_mapping(j);
+            model[base + k].except_bytes = exception_bytes(j);
+            model[base + k].except_mask = (1ULL << (model[base + k].except_bytes << 3)) - 1;
             model[base + k].freq = cur_freq;
             model[base + k].offset = k;
         }
@@ -197,32 +231,26 @@ void create_dec_model(std::vector<uint8_t>& dec_models, const ans_msb::enc_model
     dec_models.insert(dec_models.end(), new_model.begin(), new_model.end());
 }
 
-uint64_t encode_num(const enc_model* model, uint64_t state, uint32_t num, uint8_t*& out)
+uint64_t encode_num(const enc_model& model, uint64_t state, uint32_t num, uint8_t*& out)
 {
-    const auto& entry = model->table[num];
-    uint32_t f = entry.freq;
-    uint64_t b = entry.base;
-
+    const auto& entry = model[num];
     // (1) normalize
     if (state >= entry.SUB) {
         ans::output_unit<ans::constants::OUTPUT_BASE_LOG2>(out, state);
     }
-
     // (2) transform state
-    uint64_t next = ((state / f) * ans_msb::constants::M) + (state % f) + b;
+    uint64_t next = ((state / entry.freq) * ans_msb::constants::M) + (state % entry.freq) + entry.base;
     return next;
 }
 
-uint32_t decode_num(const dec_model* model, uint64_t& state, const uint8_t*& in, size_t& enc_size)
+const dec_table_entry& decode_num(const dec_model& model, uint64_t& state, const uint8_t*& in, size_t& enc_size)
 {
     uint64_t state_mod_M = state & ans_msb::constants::MASK_M;
-    const auto& entry = model->table[state_mod_M];
-    uint32_t num = entry.sym;
-    uint32_t f = entry.freq;
-    state = f * (state >> ans_msb::constants::LOG2_M) + entry.offset;
+    const auto& entry = model[state_mod_M];
+    state = entry.freq * (state >> ans_msb::constants::LOG2_M) + entry.offset;
     if (enc_size && state < ans_msb::constants::NORM_LOWER_BOUND) {
         ans::input_unit<ans::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
     }
-    return num;
+    return entry;
 }
 }
