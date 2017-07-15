@@ -20,7 +20,7 @@ struct msb_model_max_1d {
     static const uint8_t MAX_MAG = 32;
     static uint32_t pick_model(uint32_t const* in, size_t n)
     {
-        static constexpr std::array<uint32_t, MAX_MAG + 1> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
+        static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
             10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
         uint32_t max_val = 0;
         for (size_t i = 0; i < n; i++) {
@@ -56,7 +56,7 @@ struct msb_model_minmax_2d {
     static const uint8_t MAX_MAG = 32;
     static uint32_t pick_model(uint32_t const* in, size_t n)
     {
-        static constexpr std::array<uint32_t, MAX_MAG + 1> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
+        static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
             10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
         uint32_t min_val = 0;
         uint32_t max_val = 0;
@@ -93,13 +93,13 @@ struct msb_model_med90p_2d {
     static const uint8_t MAX_MAG = 32;
     static uint32_t pick_model(uint32_t const* in, size_t n)
     {
-        static constexpr std::array<uint32_t, MAX_MAG + 1> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
+        static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
             10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
         static std::vector<uint32_t> buf(ans::constants::BLOCK_SIZE);
         std::copy(in, in + n, buf.begin());
         std::sort(buf.begin(), buf.begin() + n);
-        uint32_t mag_med = ans::magnitude(buf[n / 2]);
-        uint32_t mag_90p = ans::magnitude(buf[n * 0.9]);
+        uint32_t mag_med = ans::magnitude(buf[n / 2] + 1);
+        uint32_t mag_90p = ans::magnitude(buf[n * 0.9] + 1);
         return (MAG2SEL[mag_90p] << 4) + MAG2SEL[mag_med];
     }
 
@@ -204,8 +204,8 @@ struct ans_msb_model {
             return;
         }
 
-        static std::array<uint8_t, block_size * 8> tmp_out_buf;
-        static std::array<uint8_t, block_size * 8> exception_out_buf;
+        static std::vector<uint8_t> tmp_out_buf(block_size * 8);
+        static std::vector<uint8_t> exception_out_buf(block_size * 8);
 
         // (2) reverse encode the block using the selected ANS model
         auto model_ptrs = reinterpret_cast<const uint64_t*>(enc_model_u8.data());
