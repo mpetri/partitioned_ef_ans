@@ -51,6 +51,77 @@ struct msb_model_max_1d {
     }
 };
 
+struct msb_model_minmax_2d {
+    static const uint32_t NUM_MODELS = 16 * 16;
+    static const uint8_t MAX_MAG = 32;
+    static uint32_t pick_model(uint32_t const* in, size_t n)
+    {
+        static constexpr std::array<uint32_t, MAX_MAG + 1> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
+            10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
+        uint32_t min_val = 0;
+        uint32_t max_val = 0;
+        for (size_t i = 0; i < n; i++) {
+            min_val = std::max(min_val, in[i] + 1);
+            max_val = std::max(max_val, in[i] + 1);
+        }
+        uint32_t min_mag = ans::magnitude(min_val);
+        uint32_t max_mag = ans::magnitude(max_val);
+        return (MAG2SEL[max_mag] << 4) + MAG2SEL[min_mag];
+    }
+
+    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out)
+    {
+        out.push_back(bh.model_id);
+        if (bh.model_id != 0) {
+            out.push_back(bh.final_state_bytes);
+            out.push_back(uint8_t(bh.num_ans_u32s));
+        }
+    }
+
+    static void read_block_header(msb_block_header& bh, uint8_t const*& in)
+    {
+        bh.model_id = *in++;
+        if (bh.model_id != 0) {
+            bh.final_state_bytes = *in++;
+            bh.num_ans_u32s = *in++;
+        }
+    }
+};
+
+struct msb_model_med90p_2d {
+    static const uint32_t NUM_MODELS = 16 * 16;
+    static const uint8_t MAX_MAG = 32;
+    static uint32_t pick_model(uint32_t const* in, size_t n)
+    {
+        static constexpr std::array<uint32_t, MAX_MAG + 1> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
+            10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
+        static std::vector<uint32_t> buf(ans::constants::BLOCK_SIZE);
+        std::copy(in, in + n, buf.begin());
+        std::sort(buf.begin(), buf.begin() + n);
+        uint32_t mag_med = ans::magnitude(buf[n / 2]);
+        uint32_t mag_90p = ans::magnitude(buf[n * 0.9]);
+        return (MAG2SEL[mag_90p] << 4) + MAG2SEL[mag_med];
+    }
+
+    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out)
+    {
+        out.push_back(bh.model_id);
+        if (bh.model_id != 0) {
+            out.push_back(bh.final_state_bytes);
+            out.push_back(uint8_t(bh.num_ans_u32s));
+        }
+    }
+
+    static void read_block_header(msb_block_header& bh, uint8_t const*& in)
+    {
+        bh.model_id = *in++;
+        if (bh.model_id != 0) {
+            bh.final_state_bytes = *in++;
+            bh.num_ans_u32s = *in++;
+        }
+    }
+};
+
 namespace quasi_succinct {
 
 template <typename model_type>
