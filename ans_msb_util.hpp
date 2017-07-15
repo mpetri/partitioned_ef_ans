@@ -26,12 +26,28 @@ namespace constants {
 
 using counts = uint64_t[constants::MAX_VAL + 1];
 
+void print_counts(const counts& tb, std::string name)
+{
+    std::cout << "COUNTS = (";
+    for (size_t i = 0; i <= constants::MAX_VAL; i++) {
+        if (tb[i] != 0)
+            std::cout << i << "=" << tb[i] << "\n";
+    }
+    std::cout << ")" << std::endl;
+}
+
 #pragma pack(1)
 struct enc_table_entry {
     uint64_t freq;
     uint64_t base;
     uint64_t SUB;
 };
+
+std::ostream& operator<<(std::ostream& os, const enc_table_entry& t)
+{
+    os << "<f=" << t.freq << ",b=" << t.base << ",SUB=" << t.SUB << ">";
+    return os;
+}
 
 using enc_model = enc_table_entry[constants::MAX_VAL + 1];
 
@@ -48,7 +64,7 @@ using dec_model = dec_table_entry[constants::M];
 
 uint16_t mapping(uint32_t x)
 {
-    uint8_t lzb = 3 - (__builtin_clz(x - 1) >> 3);
+    uint8_t lzb = 3 - (__builtin_clz(x) >> 3);
     return (x >> (lzb << 3)) + (lzb << 8);
 }
 
@@ -119,6 +135,7 @@ uint16_t mapping_alistair(uint32_t x)
 
 std::vector<uint64_t> normalize_freqs(const counts& freqs, size_t target_power)
 {
+    // print_counts(freqs, "initital");
     std::vector<uint64_t> nfreqs(freqs, freqs + constants::MAX_VAL + 1);
     uint32_t n = 0;
     uint64_t initial_sum = 0;
@@ -171,7 +188,7 @@ std::vector<uint64_t> normalize_freqs(const counts& freqs, size_t target_power)
         fprintf(stderr, "ERROR! not power of 2 after normalization = %lu", M);
         exit(EXIT_FAILURE);
     }
-
+    // print_counts(freqs, "final");
     return nfreqs;
 }
 

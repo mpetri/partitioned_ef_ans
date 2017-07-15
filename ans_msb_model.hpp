@@ -17,7 +17,6 @@ struct msb_block_header {
 
 struct msb_model_max_1d {
     static const uint32_t NUM_MODELS = 16;
-    static const uint8_t MAX_MAG = 32;
     static uint32_t pick_model(uint32_t const* in, size_t n)
     {
         static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
@@ -53,15 +52,14 @@ struct msb_model_max_1d {
 
 struct msb_model_minmax_2d {
     static const uint32_t NUM_MODELS = 16 * 16;
-    static const uint8_t MAX_MAG = 32;
     static uint32_t pick_model(uint32_t const* in, size_t n)
     {
         static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
             10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
-        uint32_t min_val = 0;
+        uint32_t min_val = std::numeric_limits<uint32_t>::max();
         uint32_t max_val = 0;
         for (size_t i = 0; i < n; i++) {
-            min_val = std::max(min_val, in[i] + 1);
+            min_val = std::min(min_val, in[i] + 1);
             max_val = std::max(max_val, in[i] + 1);
         }
         uint32_t min_mag = ans::magnitude(min_val);
@@ -90,7 +88,6 @@ struct msb_model_minmax_2d {
 
 struct msb_model_med90p_2d {
     static const uint32_t NUM_MODELS = 16 * 16;
-    static const uint8_t MAX_MAG = 32;
     static uint32_t pick_model(uint32_t const* in, size_t n)
     {
         static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
@@ -187,7 +184,7 @@ struct ans_msb_model {
         auto& counts = *counts_ptr;
         auto model_id = model_type::pick_model(in, n);
         for (size_t i = 0; i < n; i++) {
-            auto msb_val = ans_msb::mapping(in[i] + 1);
+            auto msb_val = ans_msb::mapping_alistair(in[i] + 1);
             counts[model_id][msb_val]++;
         }
     }
