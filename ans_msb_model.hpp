@@ -100,21 +100,32 @@ struct msb_model_med90p_2d {
         return (MAG2SEL[mag_90p] << 4) + MAG2SEL[mag_med];
     }
 
-    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out, size_t)
+    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out, size_t n)
     {
         out.push_back(bh.model_id);
         if (bh.model_id != 0) {
-            out.push_back(bh.final_state_bytes);
-            out.push_back(uint8_t(bh.num_ans_u32s));
+            if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
+                uint8_t packed = ans::pack_two_4bit_nums(bh.final_state_bytes, uint8_t(bh.num_ans_u32s));
+                out.push_back(packed);
+            } else {
+                out.push_back(bh.final_state_bytes);
+                out.push_back(uint8_t(bh.num_ans_u32s));
+            }
         }
     }
 
-    static void read_block_header(msb_block_header& bh, uint8_t const*& in, size_t)
+    static void read_block_header(msb_block_header& bh, uint8_t const*& in, size_t n)
     {
         bh.model_id = *in++;
         if (bh.model_id != 0) {
-            bh.final_state_bytes = *in++;
-            bh.num_ans_u32s = *in++;
+            if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
+                auto fsb_and_nu32 = ans::unpack_two_4bit_nums(*in++);
+                bh.final_state_bytes = fsb_and_nu32.first;
+                bh.num_ans_u32s = fsb_and_nu32.second;
+            } else {
+                bh.final_state_bytes = *in++;
+                bh.num_ans_u32s = *in++;
+            }
         }
     }
 };
