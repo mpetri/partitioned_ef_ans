@@ -126,8 +126,6 @@ struct msb_model_med90p_2d_es {
         static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
             10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
         static std::vector<uint32_t> buf(ans::constants::BLOCK_SIZE);
-        if (n <= ans_msb::constants::COMPACT_THRESHOLD)
-            return NUM_MODELS - 1;
         std::copy(in, in + n, buf.begin());
         std::sort(buf.begin(), buf.begin() + n);
         uint32_t mag_med = ans::magnitude(buf[n / 2] + 1);
@@ -239,6 +237,9 @@ struct ans_msb_model {
     static void encode(uint32_t const* in, uint32_t /*sum_of_values*/,
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
+        if (n == 1)
+            return; // sum_of_values == free!
+
         // (1) determine and encode model id
         msb_block_header bh;
         bh.model_id = model_type::pick_model(in, n);
@@ -287,8 +288,12 @@ struct ans_msb_model {
 
     static uint8_t const*
     decode(uint8_t const* in, uint32_t* out,
-        uint32_t /* sum_of_values */, size_t n, uint8_t const* dec_model_u8)
+        uint32_t sum_of_values, size_t n, uint8_t const* dec_model_u8)
     {
+        if (n == 1) {
+            *out = sum_of_values;
+            return;
+        }
         msb_block_header bh;
         model_type::read_block_header(bh, in, n);
 
