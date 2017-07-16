@@ -245,11 +245,11 @@ struct ans_msb_model {
         }
     }
 
-    static void encode(uint32_t const* in, uint32_t /*sum_of_values*/,
+    static void encode(uint32_t const* in, uint32_t sum_of_values,
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
-        if (n == 1)
-            return; // sum_of_values == free!
+        if (n == 1 && sum_of_values != uint32_t(-1))
+            return; // sum_of_values == free if not -1!
 
         // (1) determine and encode model id
         msb_block_header bh;
@@ -301,7 +301,7 @@ struct ans_msb_model {
     decode(uint8_t const* in, uint32_t* out,
         uint32_t sum_of_values, size_t n, uint8_t const* dec_model_u8)
     {
-        if (n == 1) {
+        if (n == 1 && sum_of_values != uint32_t(-1)) {
             *out = sum_of_values;
             return in;
         }
