@@ -50,6 +50,7 @@ typedef ans_block_freq_index<quasi_succinct::ans_packed_model<model_max_1d>> blo
 typedef ans_block_freq_index<quasi_succinct::ans_msb_model<msb_model_max_1d>> block_ansmsb_index;
 typedef ans_block_freq_index<quasi_succinct::ans_msb_model<msb_model_minmax_2d>> block_ansmsbminmax_index;
 typedef ans_block_freq_index<quasi_succinct::ans_msb_model<msb_model_med90p_2d>> block_ansmsbmed90p_index;
+typedef ans_block_freq_index<quasi_succinct::ans_msb_model<msb_model_med90p_2d_es>> block_ansmsbmed90pes_index;
 }
 
-#define QS_INDEX_TYPES (ef)(single)(uniform)(opt)(block_optpfor)(block_varint)(block_interpolative)(block_u32)(block_vbyte)(block_simple16)(block_anspacked)(block_ansmsb)(block_ansmsbminmax)(block_ansmsbmed90p)
+#define QS_INDEX_TYPES (ef)(single)(uniform)(opt)(block_optpfor)(block_varint)(block_interpolative)(block_u32)(block_vbyte)(block_simple16)(block_anspacked)(block_ansmsb)(block_ansmsbminmax)(block_ansmsbmed90p)(block_ansmsbmed90pes)
