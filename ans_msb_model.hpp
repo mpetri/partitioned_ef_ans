@@ -303,7 +303,7 @@ struct ans_msb_model {
     {
         if (n == 1) {
             *out = sum_of_values;
-            return;
+            return in;
         }
         msb_block_header bh;
         model_type::read_block_header(bh, in, n);
