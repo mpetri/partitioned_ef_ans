@@ -21,6 +21,12 @@ struct block_size_stats {
         small_list_postings = 0;
         last_nonfull_postings = 0;
         full_block_postings = 0;
+        for (size_t i = 0; i < 128; i++) {
+            small_list_doc_bytesA[i] = 0;
+            small_list_freq_bytesA[i] = 0;
+            small_list_doc_postingsA[i] = 0;
+            small_list_freq_postingsA[i] = 0;
+        }
     }
 
     uint64_t total_doc_bytes;
@@ -35,7 +41,10 @@ struct block_size_stats {
     uint64_t small_list_postings;
     uint64_t last_nonfull_postings;
     uint64_t full_block_postings;
-
+    uint64_t small_list_doc_bytesA[128];
+    uint64_t small_list_freq_bytesA[128];
+    uint64_t small_list_doc_postingsA[128];
+    uint64_t small_list_freq_postingsA[128];
     block_size_stats& operator+=(const block_size_stats& rhs)
     {
         this->total_postings += rhs.total_postings;
@@ -50,6 +59,12 @@ struct block_size_stats {
         this->last_nonfull_doc_bytes += rhs.last_nonfull_doc_bytes;
         this->last_nonfull_freq_bytes += rhs.last_nonfull_freq_bytes;
         this->last_nonfull_postings += rhs.last_nonfull_postings;
+        for (size_t i = 0; i < 128; i++) {
+            this->small_list_doc_bytesA[i] += rhs.small_list_doc_bytesA[i];
+            this->small_list_freq_bytesA[i] += rhs.small_list_freq_bytesA[i];
+            this->small_list_doc_postingsA[i] += rhs.small_list_doc_postingsA[i];
+            this->small_list_freq_postingsA[i] += rhs.small_list_freq_postingsA[i];
+        }
         return *this;
     }
 };
@@ -85,6 +100,20 @@ std::ostream& operator<<(std::ostream& o, const block_size_stats& stats)
     o << "small_list_freqs_BPI = " << double(stats.small_list_freq_bytes * 8) / double(stats.small_list_postings) << "\n";
     o << "last_nonfull_docs_BPI = " << double(stats.last_nonfull_doc_bytes * 8) / double(stats.last_nonfull_postings) << "\n";
     o << "last_nonfull_freqs_BPI = " << double(stats.last_nonfull_freq_bytes * 8) / double(stats.last_nonfull_postings) << "\n";
+    for (size_t i = 1; i < 128; i++) {
+        if (stats.small_list_doc_postingsA[i]) {
+            o << "small_list_docs_BPI[" << i << "] = " << double(stats.small_list_doc_bytesA[i] * 8) / double(stats.small_list_doc_postingsA[i]) << " (";
+            o << double(stats.small_list_doc_postingsA[i]) / double(stats.small_list_postings) * 100 << " % small postings - ";
+            o << double(stats.small_list_doc_bytesA[i]) / double(stats.small_list_doc_bytes) * 100 << " % small postings space)\n";
+        }
+    }
+    for (size_t i = 1; i < 128; i++) {
+        if (stats.small_list_freq_postingsA[i]) {
+            o << "small_list_freq_BPI[" << i << "] = " << double(stats.small_list_freq_bytesA[i] * 8) / double(stats.small_list_freq_postingsA[i]) << " (";
+            o << double(stats.small_list_freq_postingsA[i]) / double(stats.small_list_postings) * 100 << " % small postings - ";
+            o << double(stats.small_list_freq_bytesA[i]) / double(stats.small_list_freq_bytes) * 100 << " % small postings space)\n";
+        }
+    }
     return o << std::dec;
 }
 
@@ -260,6 +289,10 @@ struct block_posting_list {
                     bss.small_list_doc_bytes = doc_bytes;
                     bss.small_list_freq_bytes = freq_bytes;
                     bss.small_list_postings = m_n;
+                    bss.small_list_doc_postingsA[m_n] += m_n;
+                    bss.small_list_freq_postingsA[m_n] += m_n;
+                    bss.small_list_doc_bytesA[m_n] += doc_bytes;
+                    bss.small_list_freq_bytesA[m_n] += freq_bytes;
                 } else {
                     if (cur_block_size < block_size) {
                         bss.last_nonfull_doc_bytes = doc_bytes;

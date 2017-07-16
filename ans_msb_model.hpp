@@ -126,7 +126,7 @@ struct msb_model_med90p_2d_es {
         static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
             10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
         static std::vector<uint32_t> buf(ans::constants::BLOCK_SIZE);
-        if (n != ans::constants::BLOCK_SIZE)
+        if (n <= ans_msb::constants::COMPACT_THRESHOLD)
             return NUM_MODELS - 1;
         std::copy(in, in + n, buf.begin());
         std::sort(buf.begin(), buf.begin() + n);
@@ -137,9 +137,9 @@ struct msb_model_med90p_2d_es {
 
     static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out, size_t n)
     {
-        if (n != ans::constants::BLOCK_SIZE) {
-            out.push_back(bh.final_state_bytes);
-            out.push_back(uint8_t(bh.num_ans_u32s));
+        if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
+            uint8_t packed = ans::pack_two_4bit_nums(bh.final_state_bytes, uint8_t(bh.num_ans_u32s));
+            out.push_back(packed);
             return;
         }
         out.push_back(bh.model_id);
@@ -151,10 +151,11 @@ struct msb_model_med90p_2d_es {
 
     static void read_block_header(msb_block_header& bh, uint8_t const*& in, size_t n)
     {
-        if (n != ans::constants::BLOCK_SIZE) {
+        if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
             bh.model_id = NUM_MODELS - 1;
-            bh.final_state_bytes = *in++;
-            bh.num_ans_u32s = *in++;
+            auto fsb_and_nu32 = ans::unpack_two_4bit_nums(*in++);
+            bh.final_state_bytes = fsb_and_nu32.first;
+            bh.num_ans_u32s = fsb_and_nu32.second;
             return;
         }
         bh.model_id = *in++;
