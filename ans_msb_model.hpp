@@ -182,10 +182,14 @@ struct ans_msb_model {
     }
 
     static void
-    model(std::vector<uint8_t>& cntsu8, uint32_t const* in, uint32_t /*sum_of_values*/, size_t n)
+    model(std::vector<uint8_t>& cntsu8, uint32_t const* in, uint32_t sum_of_values, size_t n)
     {
         auto counts_ptr = reinterpret_cast<ans_msb_counts_table*>(cntsu8.data());
         auto& counts = *counts_ptr;
+        // exclude things we will not code using ANS
+        if (sum_of_values != uint32_t(-1) && n <= ans_msb::constants::VBYTE_THRESHOLD) {
+            return;
+        }
         auto model_id = model_type::pick_model(in, n);
         for (size_t i = 0; i < n; i++) {
             auto msb_val = ans_msb::mapping_alistair(in[i] + 1);
