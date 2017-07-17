@@ -8,6 +8,7 @@
 
 #include "ans_msb_util.hpp"
 #include "ans_util.hpp"
+#include "block_codecs.hpp"
 
 struct msb_block_header {
     uint32_t model_id = 0;
@@ -149,11 +150,11 @@ struct msb_model_med90p_2d_es {
         out.push_back(bh.model_id);
 
         if (bh.model_id != 0) {
-            if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
-                uint8_t packed = ans::pack_two_4bit_nums(bh.final_state_bytes, uint8_t(bh.num_ans_u32s));
-                out.push_back(packed);
-                return;
-            }
+            // if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
+            //     uint8_t packed = ans::pack_two_4bit_nums(bh.final_state_bytes, uint8_t(bh.num_ans_u32s));
+            //     out.push_back(packed);
+            //     return;
+            // }
             out.push_back(bh.final_state_bytes);
             out.push_back(uint8_t(bh.num_ans_u32s));
         }
@@ -163,12 +164,12 @@ struct msb_model_med90p_2d_es {
     {
         bh.model_id = *in++;
         if (bh.model_id != 0) {
-            if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
-                auto fsb_and_nu32 = ans::unpack_two_4bit_nums(*in++);
-                bh.final_state_bytes = fsb_and_nu32.first;
-                bh.num_ans_u32s = fsb_and_nu32.second;
-                return;
-            }
+            // if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
+            //     auto fsb_and_nu32 = ans::unpack_two_4bit_nums(*in++);
+            //     bh.final_state_bytes = fsb_and_nu32.first;
+            //     bh.num_ans_u32s = fsb_and_nu32.second;
+            //     return;
+            // }
             bh.final_state_bytes = *in++;
             bh.num_ans_u32s = *in++;
         }
@@ -248,8 +249,12 @@ struct ans_msb_model {
     static void encode(uint32_t const* in, uint32_t sum_of_values,
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
-        if (n == 1 && sum_of_values != uint32_t(-1))
-            return; // sum_of_values == free if not -1ca!
+        if (n <= ans_msb::constants::VBYTE_THRESHOLD) {
+            if (n == 1 && sum_of_values != uint32_t(-1))
+                return;
+            vbyte_block::encode(in, sum_of_values, n, out);
+            return;
+        }
 
         // (1) determine and encode model id
         msb_block_header bh;
@@ -301,9 +306,12 @@ struct ans_msb_model {
     decode(uint8_t const* in, uint32_t* out,
         uint32_t sum_of_values, size_t n, uint8_t const* dec_model_u8)
     {
-        if (n == 1 && sum_of_values != uint32_t(-1)) {
-            *out = sum_of_values;
-            return in;
+        if (n <= ans_msb::constants::VBYTE_THRESHOLD) {
+            if (n == 1 && sum_of_values != uint32_t(-1)) {
+                *out = sum_of_values;
+                return in;
+            }
+            return TightVariableByte::decode(in, out, n);
         }
         msb_block_header bh;
         model_type::read_block_header(bh, in, n);

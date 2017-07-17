@@ -22,6 +22,7 @@ namespace constants {
     constexpr uint8_t OUTPUT_BASE_LOG2 = 32;
     constexpr uint64_t OUTPUT_BASE = 1ULL << OUTPUT_BASE_LOG2;
     constexpr uint64_t NORM_LOWER_BOUND = 1ULL << 31;
+    constexpr uint64_t VBYTE_THRESHOLD = 10;
     constexpr uint64_t COMPACT_THRESHOLD = 16;
 }
 
