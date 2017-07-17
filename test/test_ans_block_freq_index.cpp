@@ -129,8 +129,8 @@ BOOST_AUTO_TEST_CASE(ans_msb_model_model_max_1d_small)
 
 BOOST_AUTO_TEST_CASE(ans_msb_model_model_max_1d_large)
 {
-    // test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(10);
-    // test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(100);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(10);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(100);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(1000);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(100000);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(1000000);
@@ -145,35 +145,24 @@ BOOST_AUTO_TEST_CASE(ans_msb_model_model_minmax_2d_small)
 
 BOOST_AUTO_TEST_CASE(ans_msb_model_model_minmax_2d_large)
 {
-    // test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(10);
-    // test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(100);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(1000);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(10);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(100);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(100000);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(1000000);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(10000000);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(20000000);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(1000);
 }
 
 BOOST_AUTO_TEST_CASE(ans_msb_model_model_med90p_2d_large)
 {
-    // test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(10);
-    // test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(100);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(10);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(100);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(1000);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(100000);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(1000000);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(10000000);
     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(20000000);
-}
-
-BOOST_AUTO_TEST_CASE(ans_msb_model_model_med90p_es_2d_large)
-{
-    // test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_es>>(10);
-    // test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_es>>(100);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_es>>(1000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_es>>(100000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_es>>(1000000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_es>>(10000000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_es>>(20000000);
 }
 
 // BOOST_AUTO_TEST_CASE(ans_packed_model_model_max_1d_small)

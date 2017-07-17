@@ -105,13 +105,6 @@ struct msb_model_med90p_2d {
     {
         out.push_back(bh.model_id);
         if (bh.model_id != 0) {
-            // if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
-            //     uint8_t packed = ans::pack_two_4bit_nums(bh.final_state_bytes, uint8_t(bh.num_ans_u32s));
-            //     out.push_back(packed);
-            // } else {
-            //     out.push_back(bh.final_state_bytes);
-            //     out.push_back(uint8_t(bh.num_ans_u32s));
-            // }
             out.push_back(bh.final_state_bytes);
             out.push_back(uint8_t(bh.num_ans_u32s));
         }
@@ -121,59 +114,6 @@ struct msb_model_med90p_2d {
     {
         bh.model_id = *in++;
         if (bh.model_id != 0) {
-            // if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
-            //     auto fsb_and_nu32 = ans::unpack_two_4bit_nums(*in++);
-            //     bh.final_state_bytes = fsb_and_nu32.first;
-            //     bh.num_ans_u32s = fsb_and_nu32.second;
-            // } else {
-            //     bh.final_state_bytes = *in++;
-            //     bh.num_ans_u32s = *in++;
-            // }
-            bh.final_state_bytes = *in++;
-            bh.num_ans_u32s = *in++;
-        }
-    }
-};
-
-struct msb_model_med90p_2d_es {
-    static const uint32_t NUM_MODELS = 16 * 16;
-    static uint32_t pick_model(uint32_t const* in, size_t n)
-    {
-        static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
-            10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
-        static std::vector<uint32_t> buf(ans::constants::BLOCK_SIZE);
-        std::copy(in, in + n, buf.begin());
-        std::sort(buf.begin(), buf.begin() + n);
-        uint32_t mag_med = ans::magnitude(buf[n / 2] + 1);
-        uint32_t mag_90p = ans::magnitude(buf[n * 0.9] + 1);
-        return (MAG2SEL[mag_90p] << 4) + MAG2SEL[mag_med];
-    }
-
-    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out, size_t n)
-    {
-        out.push_back(bh.model_id);
-
-        if (bh.model_id != 0) {
-            // if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
-            //     uint8_t packed = ans::pack_two_4bit_nums(bh.final_state_bytes, uint8_t(bh.num_ans_u32s));
-            //     out.push_back(packed);
-            //     return;
-            // }
-            out.push_back(bh.final_state_bytes);
-            out.push_back(uint8_t(bh.num_ans_u32s));
-        }
-    }
-
-    static void read_block_header(msb_block_header& bh, uint8_t const*& in, size_t n)
-    {
-        bh.model_id = *in++;
-        if (bh.model_id != 0) {
-            // if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
-            //     auto fsb_and_nu32 = ans::unpack_two_4bit_nums(*in++);
-            //     bh.final_state_bytes = fsb_and_nu32.first;
-            //     bh.num_ans_u32s = fsb_and_nu32.second;
-            //     return;
-            // }
             bh.final_state_bytes = *in++;
             bh.num_ans_u32s = *in++;
         }
@@ -253,10 +193,15 @@ struct ans_msb_model {
     static void encode(uint32_t const* in, uint32_t sum_of_values,
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
+        static std::vector<uint8_t> tmp_out_buf(block_size * 8);
+        static std::vector<uint8_t> exception_out_buf(block_size * 8);
+
         if (sum_of_values != uint32_t(-1) && n <= ans_msb::constants::VBYTE_THRESHOLD) {
             if (n == 1)
                 return;
-            vbyte_block::encode(in, sum_of_values, n, out);
+            size_t out_len = tmp_out_buf.size();
+            TightVariableByte::encode(in, n, tmp_out_buf.data(), out_len);
+            out.insert(out.end(), tmp_out_buf.data(), tmp_out_buf.data() + out_len);
             return;
         }
 
@@ -268,9 +213,6 @@ struct ans_msb_model {
             model_type::write_block_header(bh, out, n);
             return;
         }
-
-        static std::vector<uint8_t> tmp_out_buf(block_size * 8);
-        static std::vector<uint8_t> exception_out_buf(block_size * 8);
 
         // (2) reverse encode the block using the selected ANS model
         auto model_ptrs = reinterpret_cast<const uint64_t*>(enc_model_u8.data());
@@ -295,6 +237,8 @@ struct ans_msb_model {
         bh.num_ans_u32s = u32s_written;
         model_type::write_block_header(bh, out, n);
 
+        // std::cout << "encode n = " << n << "model_id = " << bh.model_id << " fsb=" << bh.final_state_bytes << std::endl;
+
         // (4) write the final state
         ans::flush_state(state, out_ptr, bh.final_state_bytes);
 
@@ -317,6 +261,7 @@ struct ans_msb_model {
             }
             return TightVariableByte::decode(in, out, n);
         }
+
         msb_block_header bh;
         model_type::read_block_header(bh, in, n);
 
