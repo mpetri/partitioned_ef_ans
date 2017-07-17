@@ -98,7 +98,10 @@ struct msb_model_med90p_2d {
         std::sort(buf.begin(), buf.begin() + n);
         uint32_t mag_med = ans::magnitude(buf[n / 2] + 1);
         uint32_t mag_90p = ans::magnitude(buf[n * 0.9] + 1);
-        return (MAG2SEL[mag_90p] << 4) + MAG2SEL[mag_med];
+        uint32_t model_id = (MAG2SEL[mag_90p] << 4) + MAG2SEL[mag_med];
+        if (model_id == 0 && buf[n - 1] != 0)
+            model_id++;
+        return model_id;
     }
 
     static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out)
@@ -236,8 +239,6 @@ struct ans_msb_model {
         bh.final_state_bytes = ans::state_bytes(state);
         bh.num_ans_u32s = u32s_written;
         model_type::write_block_header(bh, out);
-
-        // std::cout << "encode n = " << n << "model_id = " << bh.model_id << " fsb=" << bh.final_state_bytes << std::endl;
 
         // (4) write the final state
         ans::flush_state(state, out_ptr, bh.final_state_bytes);

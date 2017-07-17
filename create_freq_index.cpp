@@ -37,7 +37,8 @@ void verify_collection(InputCollection const& input, const char* filename)
 
             if (docid != e.docid()) {
                 logger() << "docid in sequence " << s
-                         << " differs at position " << i << "!" << std::endl;
+                         << " differs at position " << i << "/" << e.size() << " i%128=" << i % 128
+                         << " !" << std::endl;
                 logger() << e.docid() << " != " << docid << std::endl;
                 logger() << "sequence length: " << seq.docs.size() << std::endl;
 
@@ -46,7 +47,8 @@ void verify_collection(InputCollection const& input, const char* filename)
 
             if (freq != e.freq()) {
                 logger() << "freq in sequence " << s
-                         << " differs at position " << i << "!" << std::endl;
+                         << " differs at position " << i << "/" << e.size() << " i%128=" << i % 128
+                         << " !" << std::endl;
                 logger() << e.freq() << " != " << freq << std::endl;
                 logger() << "sequence length: " << seq.docs.size() << std::endl;
 
