@@ -30,7 +30,7 @@ struct msb_model_max_1d {
         return MAG2SEL[max_mag];
     }
 
-    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out, size_t)
+    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out)
     {
         uint8_t packed = ans::pack_two_4bit_nums(bh.model_id, bh.final_state_bytes);
         out.push_back(packed);
@@ -39,7 +39,7 @@ struct msb_model_max_1d {
         }
     }
 
-    static void read_block_header(msb_block_header& bh, uint8_t const*& in, size_t)
+    static void read_block_header(msb_block_header& bh, uint8_t const*& in)
     {
         uint8_t packed = *in++;
         auto model_and_fsb = ans::unpack_two_4bit_nums(packed);
@@ -68,7 +68,7 @@ struct msb_model_minmax_2d {
         return (MAG2SEL[max_mag] << 4) + MAG2SEL[min_mag];
     }
 
-    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out, size_t)
+    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out)
     {
         out.push_back(bh.model_id);
         if (bh.model_id != 0) {
@@ -77,7 +77,7 @@ struct msb_model_minmax_2d {
         }
     }
 
-    static void read_block_header(msb_block_header& bh, uint8_t const*& in, size_t)
+    static void read_block_header(msb_block_header& bh, uint8_t const*& in)
     {
         bh.model_id = *in++;
         if (bh.model_id != 0) {
@@ -101,7 +101,7 @@ struct msb_model_med90p_2d {
         return (MAG2SEL[mag_90p] << 4) + MAG2SEL[mag_med];
     }
 
-    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out, size_t n)
+    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out)
     {
         out.push_back(bh.model_id);
         if (bh.model_id != 0) {
@@ -110,7 +110,7 @@ struct msb_model_med90p_2d {
         }
     }
 
-    static void read_block_header(msb_block_header& bh, uint8_t const*& in, size_t n)
+    static void read_block_header(msb_block_header& bh, uint8_t const*& in)
     {
         bh.model_id = *in++;
         if (bh.model_id != 0) {
@@ -210,7 +210,7 @@ struct ans_msb_model {
         bh.model_id = model_type::pick_model(in, n);
 
         if (bh.model_id == 0) { // all 1s. continue
-            model_type::write_block_header(bh, out, n);
+            model_type::write_block_header(bh, out);
             return;
         }
 
@@ -235,7 +235,7 @@ struct ans_msb_model {
 
         bh.final_state_bytes = ans::state_bytes(state);
         bh.num_ans_u32s = u32s_written;
-        model_type::write_block_header(bh, out, n);
+        model_type::write_block_header(bh, out);
 
         // std::cout << "encode n = " << n << "model_id = " << bh.model_id << " fsb=" << bh.final_state_bytes << std::endl;
 
@@ -263,7 +263,7 @@ struct ans_msb_model {
         }
 
         msb_block_header bh;
-        model_type::read_block_header(bh, in, n);
+        model_type::read_block_header(bh, in);
 
         // uniform block
         if (bh.model_id == 0) {

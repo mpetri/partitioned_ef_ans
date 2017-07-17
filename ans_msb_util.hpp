@@ -28,16 +28,6 @@ namespace constants {
 
 using counts = uint64_t[constants::MAX_VAL + 1];
 
-void print_counts(const counts& tb, std::string name)
-{
-    std::cout << "COUNTS = (";
-    for (size_t i = 0; i <= constants::MAX_VAL; i++) {
-        if (tb[i] != 0)
-            std::cout << i << "=" << tb[i] << "\n";
-    }
-    std::cout << ")" << std::endl;
-}
-
 #pragma pack(1)
 struct enc_table_entry {
     uint64_t freq;
@@ -137,7 +127,6 @@ uint16_t mapping_alistair(uint32_t x)
 
 std::vector<uint64_t> normalize_freqs(const counts& freqs, size_t target_power)
 {
-    // print_counts(freqs, "initital");
     std::vector<uint64_t> nfreqs(freqs, freqs + constants::MAX_VAL + 1);
     uint32_t n = 0;
     uint64_t initial_sum = 0;
@@ -190,7 +179,6 @@ std::vector<uint64_t> normalize_freqs(const counts& freqs, size_t target_power)
         fprintf(stderr, "ERROR! not power of 2 after normalization = %lu", M);
         exit(EXIT_FAILURE);
     }
-    // print_counts(freqs, "final");
     return nfreqs;
 }
 
