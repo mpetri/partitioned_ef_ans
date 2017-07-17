@@ -131,7 +131,7 @@ struct msb_model_med90p_2d {
 };
 
 struct msb_model_med90p_2d_es {
-    static const uint32_t NUM_MODELS = 16 * 16 + 1;
+    static const uint32_t NUM_MODELS = 16 * 16;
     static uint32_t pick_model(uint32_t const* in, size_t n)
     {
         static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
@@ -146,13 +146,14 @@ struct msb_model_med90p_2d_es {
 
     static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out, size_t n)
     {
-        if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
-            uint8_t packed = ans::pack_two_4bit_nums(bh.final_state_bytes, uint8_t(bh.num_ans_u32s));
-            out.push_back(packed);
-            return;
-        }
         out.push_back(bh.model_id);
+
         if (bh.model_id != 0) {
+            if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
+                uint8_t packed = ans::pack_two_4bit_nums(bh.final_state_bytes, uint8_t(bh.num_ans_u32s));
+                out.push_back(packed);
+                return;
+            }
             out.push_back(bh.final_state_bytes);
             out.push_back(uint8_t(bh.num_ans_u32s));
         }
@@ -160,15 +161,14 @@ struct msb_model_med90p_2d_es {
 
     static void read_block_header(msb_block_header& bh, uint8_t const*& in, size_t n)
     {
-        if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
-            bh.model_id = NUM_MODELS - 1;
-            auto fsb_and_nu32 = ans::unpack_two_4bit_nums(*in++);
-            bh.final_state_bytes = fsb_and_nu32.first;
-            bh.num_ans_u32s = fsb_and_nu32.second;
-            return;
-        }
         bh.model_id = *in++;
         if (bh.model_id != 0) {
+            if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
+                auto fsb_and_nu32 = ans::unpack_two_4bit_nums(*in++);
+                bh.final_state_bytes = fsb_and_nu32.first;
+                bh.num_ans_u32s = fsb_and_nu32.second;
+                return;
+            }
             bh.final_state_bytes = *in++;
             bh.num_ans_u32s = *in++;
         }
@@ -249,7 +249,7 @@ struct ans_msb_model {
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
         if (n == 1 && sum_of_values != uint32_t(-1))
-            return; // sum_of_values == free if not -1!
+            return; // sum_of_values == free if not -1ca!
 
         // (1) determine and encode model id
         msb_block_header bh;
