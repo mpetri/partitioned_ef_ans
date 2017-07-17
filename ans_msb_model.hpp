@@ -105,13 +105,15 @@ struct msb_model_med90p_2d {
     {
         out.push_back(bh.model_id);
         if (bh.model_id != 0) {
-            if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
-                uint8_t packed = ans::pack_two_4bit_nums(bh.final_state_bytes, uint8_t(bh.num_ans_u32s));
-                out.push_back(packed);
-            } else {
-                out.push_back(bh.final_state_bytes);
-                out.push_back(uint8_t(bh.num_ans_u32s));
-            }
+            // if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
+            //     uint8_t packed = ans::pack_two_4bit_nums(bh.final_state_bytes, uint8_t(bh.num_ans_u32s));
+            //     out.push_back(packed);
+            // } else {
+            //     out.push_back(bh.final_state_bytes);
+            //     out.push_back(uint8_t(bh.num_ans_u32s));
+            // }
+            out.push_back(bh.final_state_bytes);
+            out.push_back(uint8_t(bh.num_ans_u32s));
         }
     }
 
@@ -119,14 +121,16 @@ struct msb_model_med90p_2d {
     {
         bh.model_id = *in++;
         if (bh.model_id != 0) {
-            if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
-                auto fsb_and_nu32 = ans::unpack_two_4bit_nums(*in++);
-                bh.final_state_bytes = fsb_and_nu32.first;
-                bh.num_ans_u32s = fsb_and_nu32.second;
-            } else {
-                bh.final_state_bytes = *in++;
-                bh.num_ans_u32s = *in++;
-            }
+            // if (n <= ans_msb::constants::COMPACT_THRESHOLD) {
+            //     auto fsb_and_nu32 = ans::unpack_two_4bit_nums(*in++);
+            //     bh.final_state_bytes = fsb_and_nu32.first;
+            //     bh.num_ans_u32s = fsb_and_nu32.second;
+            // } else {
+            //     bh.final_state_bytes = *in++;
+            //     bh.num_ans_u32s = *in++;
+            // }
+            bh.final_state_bytes = *in++;
+            bh.num_ans_u32s = *in++;
         }
     }
 };
