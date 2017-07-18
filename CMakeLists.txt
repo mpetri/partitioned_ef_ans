@@ -1,21 +1,20 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.2.2)
 project(INDEX_PARTITIONING)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED on)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.2" )
+
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
 endif ()
 
 if (UNIX)
-   # C++11
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-
-   # For hardware popcount
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.2")
-
    # Extensive warnings
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-missing-braces")
    # Silence a warning bug in Boost
@@ -23,12 +22,10 @@ if (UNIX)
      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs")
    endif ()
    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wconversion")
-
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb") # Add debug info anyway
-
 endif()
 
-find_package(Boost 1.42.0 COMPONENTS iostreams unit_test_framework REQUIRED)
+find_package(Boost 1.42.0 COMPONENTS iostreams unit_test_framework program_options system REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
@@ -67,6 +64,13 @@ target_link_libraries(queries
   ${Boost_LIBRARIES}
   FastPFor_lib
   block_codecs
+  )
+
+# This binary requires libstemmer0d and libstemmer-dev on ubuntu
+add_executable(transform_queries ${CMAKE_SOURCE_DIR}/transform_queries.cpp)
+target_link_libraries(transform_queries
+  ${Boost_LIBRARIES}
+  stemmer
   )
 
 enable_testing()
