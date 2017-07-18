@@ -27,6 +27,72 @@ namespace constants {
 
 using counts = uint64_t[constants::MAX_VAL + 1];
 
+std::pair<double, uint64_t>
+compute_entropy(const counts& cnts)
+{
+    double H = 0;
+    double N = 0;
+    for (size_t i = 0; i <= constants::MAX_VAL; i++)
+        N += cnts[i];
+    if (N == 0)
+        return { 0, 0 };
+    for (size_t i = 0; i <= constants::MAX_VAL; i++) {
+        double n = cnts[i];
+        if (cnts[i])
+            H += n * log2(N / n);
+    }
+    return { H, N };
+}
+
+double
+compute_loss(counts& A, counts& B, std::pair<double, uint64_t> H_a, std::pair<double, uint64_t> H_b)
+{
+    if (H_a.second == 0 || H_b.second == 0) // cant merge empty stuff
+        return std::numeric_limits<double>::max();
+
+    // compute combined entropy
+    double Nc = H_a.second + H_b.second;
+    double Hc = 0.0;
+    for (size_t i = 0; i <= constants::MAX_VAL; i++) {
+        if (A[i] || B[i]) {
+            Hc += double(A[i] + B[i]) * log2(Nc / double(A[i] + B[i]));
+        }
+    }
+    return Hc - H_a.first - H_b.first;
+}
+
+template <class t_cnts>
+std::pair<uint64_t, uint64_t>
+find_min_pair(t_cnts& cnts, size_t num_models, std::vector<std::pair<double, uint64_t>>& model_entropy)
+{
+    double min_loss = std::numeric_limits<double>::max();
+    std::pair<uint64_t, uint64_t> min_pair{ 0, 0 };
+    for (size_t i = 0; i < num_models; i++) {
+        for (size_t j = i + 1; j < num_models; j++) {
+            double pair_loss = compute_loss(cnts[i], cnts[j], model_entropy[i], model_entropy[j]);
+            if (pair_loss < min_loss) {
+                min_loss = pair_loss;
+                min_pair.first = i;
+                min_pair.second = j;
+            }
+        }
+    }
+    std::cout << "find_min_pair = <" << min_pair.first << "," << min_pair.second << "> loss = " << min_loss << std::endl;
+    return min_pair;
+}
+
+template <class t_cnts>
+void merge_models(t_cnts& counts, std::vector<std::pair<double, uint64_t>>& model_entropy, uint64_t from, uint64_t to)
+{
+    model_entropy[from] = { 0.0, 0 };
+    for (size_t i = 0; i <= constants::MAX_VAL; i++) {
+        counts[to][i] += counts[from][i];
+        counts[from][i] = 0;
+    }
+    std::cout << "merge_moddels(from=" << from << ",to=" << to << ")" << std::endl;
+    model_entropy[to] = compute_entropy(counts[to]);
+}
+
 #pragma pack(1)
 struct enc_table_entry {
     uint64_t freq;

@@ -122,47 +122,58 @@ void test_ans_block_freq_index_large(size_t avg_gap = 10)
     }
 }
 
-BOOST_AUTO_TEST_CASE(ans_msb_model_model_max_1d_small)
-{
-    test_ans_block_freq_index_small<quasi_succinct::ans_msb_model<msb_model_max_1d>>();
-}
+// BOOST_AUTO_TEST_CASE(ans_msb_model_model_max_1d_small)
+// {
+//     test_ans_block_freq_index_small<quasi_succinct::ans_msb_model<msb_model_max_1d>>();
+// }
 
-BOOST_AUTO_TEST_CASE(ans_msb_model_model_max_1d_large)
-{
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(10);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(100);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(1000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(100000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(1000000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(10000000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(20000000);
-}
+// BOOST_AUTO_TEST_CASE(ans_msb_model_model_max_1d_large)
+// {
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(10);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(100);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(1000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(100000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(1000000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(10000000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_max_1d>>(20000000);
+// }
 
-BOOST_AUTO_TEST_CASE(ans_msb_model_model_minmax_2d_small)
-{
-    test_ans_block_freq_index_small<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>();
-}
+// BOOST_AUTO_TEST_CASE(ans_msb_model_model_minmax_2d_small)
+// {
+//     test_ans_block_freq_index_small<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>();
+// }
 
-BOOST_AUTO_TEST_CASE(ans_msb_model_model_minmax_2d_large)
-{
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(10);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(100);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(100000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(1000000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(10000000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(20000000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(1000);
-}
+// BOOST_AUTO_TEST_CASE(ans_msb_model_model_minmax_2d_large)
+// {
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(10);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(100);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(100000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(1000000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(10000000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(20000000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_minmax_2d>>(1000);
+// }
 
-BOOST_AUTO_TEST_CASE(ans_msb_model_model_med90p_2d_large)
+// BOOST_AUTO_TEST_CASE(ans_msb_model_model_med90p_2d_large)
+// {
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(10);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(100);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(1000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(100000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(1000000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(10000000);
+//     test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(20000000);
+// }
+
+BOOST_AUTO_TEST_CASE(ans_msb_model_model_med90p_2d_merged_large)
 {
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(10);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(100);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(1000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(100000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(1000000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(10000000);
-    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d>>(20000000);
+    test_ans_block_freq_index_small<quasi_succinct::ans_msb_model<msb_model_med90p_2d_merged<4>>>();
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_merged<4>>>(10);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_merged<4>>>(100);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_merged<4>>>(1000);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_merged<4>>>(10000);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_merged<4>>>(100000);
+    test_ans_block_freq_index_large<quasi_succinct::ans_msb_model<msb_model_med90p_2d_merged<4>>>(1000000);
 }
 
 // BOOST_AUTO_TEST_CASE(ans_packed_model_model_max_1d_small)
