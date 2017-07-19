@@ -108,7 +108,7 @@ std::ostream& operator<<(std::ostream& os, const enc_table_entry& t)
 
 struct enc_model {
     uint64_t M;
-    enc_table_entry table[constants::MAX_VAL + 1];
+    enc_table_entry table[0];
 };
 
 #pragma pack(1)
@@ -278,7 +278,7 @@ bool create_enc_model(std::vector<uint8_t>& enc_models, const counts& cnts)
     auto norm_counts = ans_msb::normalize_freqs(cnts, target_PTWO);
 
     // (2) create the encoding model
-    size_t model_size = sizeof(ans_msb::enc_model);
+    size_t model_size = sizeof(ans_msb::enc_model) + (constants::MAX_VAL + 1) * sizeof(enc_table_entry);
     std::vector<uint8_t> new_model(model_size);
     auto model_ptr = reinterpret_cast<ans_msb::enc_model*>(new_model.data());
     auto& model = *model_ptr;

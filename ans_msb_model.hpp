@@ -331,6 +331,8 @@ struct ans_msb_model {
     static void encode(uint32_t const* in, uint32_t sum_of_values,
         size_t n, std::vector<uint8_t>& out, const std::vector<uint8_t>& enc_model_u8)
     {
+        if (sum_of_values == 0)
+            return;
         static std::vector<uint8_t> tmp_out_buf(block_size * 8);
         static std::vector<uint8_t> exception_out_buf(block_size * 8);
 
@@ -390,6 +392,11 @@ struct ans_msb_model {
     decode(uint8_t const* in, uint32_t* out,
         uint32_t sum_of_values, size_t n, uint8_t const* dec_model_u8)
     {
+        if (sum_of_values == 0) {
+            for (size_t i = 0; i < n; i++)
+                out[i] = 0;
+            return in;
+        }
         if (sum_of_values != uint32_t(-1) && n <= ans_msb::constants::VBYTE_THRESHOLD) {
             if (n == 1) {
                 *out = sum_of_values;
