@@ -27,12 +27,13 @@ namespace constants {
 
 using counts = uint64_t[constants::MAX_VAL + 1];
 
-template<class t_vec>
-void print_cnts(const t_vec& cnts) {
-    for(size_t i=0;i<=constants::MAX_VAL;i++) {
-        if(cnts[i] != 0) {
+template <class t_vec>
+void print_cnts(const t_vec& cnts)
+{
+    for (size_t i = 0; i <= constants::MAX_VAL; i++) {
+        if (cnts[i] != 0) {
             std::cout << i << " = " << cnts[i] << std::endl;
-        }   
+        }
     }
 }
 
@@ -224,7 +225,7 @@ std::vector<uint64_t> normalize_freqs(const counts& freqs, size_t target_power)
     double C = double(target_power) / double(initial_sum);
     uint64_t M = std::numeric_limits<uint64_t>::max();
     float fudge = 1.0;
-    while( M > target_power ) {
+    while (M > target_power) {
         fudge -= 0.01;
         for (size_t i = 1; i < n; i++) {
             nfreqs[i] = fudge * freqs[i] * C;
@@ -289,12 +290,12 @@ bool create_enc_model(std::vector<uint8_t>& enc_models, const counts& cnts)
         target_PTWO = ans::next_power_of_two(target_PTWO);
 
     // (1) normalize the counts
-    std::cout << "unique syms = " << uniq_syms << std::endl;
-    std::cout << "actual counts = " << std::endl;
-    print_cnts(cnts);
+    // std::cout << "unique syms = " << uniq_syms << std::endl;
+    // std::cout << "actual counts = " << std::endl;
+    // print_cnts(cnts);
     auto norm_counts = ans_msb::normalize_freqs(cnts, target_PTWO);
-    std::cout << "normalized counts = " << std::endl;
-    print_cnts(norm_counts);
+    // std::cout << "normalized counts = " << std::endl;
+    // print_cnts(norm_counts);
 
     // (2) create the encoding model
     size_t model_size = sizeof(ans_msb::enc_model) + (constants::MAX_VAL + 1) * sizeof(enc_table_entry);

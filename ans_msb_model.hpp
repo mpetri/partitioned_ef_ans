@@ -50,9 +50,11 @@ struct msb_model_max_1d {
         }
     }
 
-    static std::vector<uint64_t> condense_models(std::vector<uint8_t>&)
+    static std::vector<uint32_t> condense_models(std::vector<uint8_t>&)
     {
-        std::vector<uint64_t> remapping(NUM_MODELS, 0);
+        std::vector<uint32_t> remapping(NUM_MODELS);
+        for (size_t i = 0; i < NUM_MODELS; i++)
+            remapping[i] = i;
         return remapping;
     }
 };
@@ -92,9 +94,11 @@ struct msb_model_minmax_2d {
         }
     }
 
-    static std::vector<uint64_t> condense_models(std::vector<uint8_t>&)
+    static std::vector<uint32_t> condense_models(std::vector<uint8_t>&)
     {
-        std::vector<uint64_t> remapping(NUM_MODELS, 0);
+        std::vector<uint32_t> remapping(NUM_MODELS);
+        for (size_t i = 0; i < NUM_MODELS; i++)
+            remapping[i] = i;
         return remapping;
     }
 };
@@ -134,9 +138,11 @@ struct msb_model_med90p_2d {
         }
     }
 
-    static std::vector<uint64_t> condense_models(std::vector<uint8_t>&)
+    static std::vector<uint32_t> condense_models(std::vector<uint8_t>&)
     {
-        std::vector<uint64_t> remapping(NUM_MODELS, 0);
+        std::vector<uint32_t> remapping(NUM_MODELS);
+        for (size_t i = 0; i < NUM_MODELS; i++)
+            remapping[i] = i;
         return remapping;
     }
 };
@@ -160,22 +166,33 @@ struct msb_model_med90p_2d_merged {
         return model_id;
     }
 
+    typedef union morder {
+        struct {
+            uint32_t model_id : 6;
+            uint32_t final_state_bytes : 3;
+            uint32_t num_ans_u32s : 7;
+        };
+        uint16_t header;
+    } compact_header;
+
     static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out)
     {
-        out.push_back(bh.model_id);
-        if (bh.model_id != 0) {
-            out.push_back(bh.final_state_bytes);
-            out.push_back(uint8_t(bh.num_ans_u32s));
-        }
+        compact_header ch;
+        ch.model_id = bh.model_id;
+        ch.final_state_bytes = bh.final_state_bytes - 1;
+        ch.num_ans_u32s = bh.num_ans_u32s;
+        out.push_back(ch.header >> 8);
+        out.push_back(ch.header & 0xFF);
     }
 
     static void read_block_header(msb_block_header& bh, uint8_t const*& in)
     {
-        bh.model_id = *in++;
-        if (bh.model_id != 0) {
-            bh.final_state_bytes = *in++;
-            bh.num_ans_u32s = *in++;
-        }
+        compact_header ch;
+        ch.header = *in++;
+        ch.header = (ch.header << 8) + *in++;
+        bh.model_id = ch.model_id;
+        bh.final_state_bytes = ch.final_state_bytes + 1;
+        bh.num_ans_u32s = ch.num_ans_u32s;
     }
 
     struct combine_cost {
@@ -183,12 +200,12 @@ struct msb_model_med90p_2d_merged {
         double H_b;
     };
 
-    static std::vector<uint64_t>
+    static std::vector<uint32_t>
     condense_models(std::vector<uint8_t>& cntsu8)
     {
         auto counts_ptr = reinterpret_cast<ans_msb_counts_table*>(cntsu8.data());
         auto& counts = *counts_ptr;
-        std::vector<uint64_t> remapping(NUM_MODELS, 0);
+        std::vector<uint32_t> remapping(NUM_MODELS, 0);
 
         // (1) compute entropy for each individual model
         std::vector<std::pair<double, uint64_t>> model_entropy(NUM_MODELS, { 0.0, 0 });
@@ -232,10 +249,28 @@ struct msb_model_med90p_2d_merged {
 
         // (4) to make the model ids small we have to remap
         //     to [1,63] and adjust the remapping again!
+        std::vector<uint32_t> remapping_final(NUM_MODELS, 0);
+
+        // (a) move the models into the right place
+        size_t j = 1; // 0 is a reserved selector
         for (size_t i = 0; i < NUM_MODELS; i++) {
+            if (remapping[i] == 0 && model_entropy[i].second != 0) { // actual model at this pos?
+                remapping_final[i] = j;
+                for (size_t k = 0; k <= ans_msb::constants::MAX_VAL; k++) {
+                    counts[j][k] = counts[i][k];
+                    counts[i][k] = 0;
+                }
+                j++;
+            }
+        }
+        // (b) fix the redirects
+        for (size_t i = 0; i < NUM_MODELS; i++) {
+            if (remapping[i] != 0) { // model redirect
+                remapping_final[i] = remapping_final[remapping[i]];
+            }
         }
 
-        return remapping;
+        return remapping_final;
     }
 };
 
@@ -258,31 +293,28 @@ struct ans_msb_model {
         // (0) condense models if necessary
         auto remap_models = model_type::condense_models(cntsu8);
 
-        // (1) create the models
         auto counts_ptr = reinterpret_cast<const ans_msb_counts_table*>(cntsu8.data());
         auto& counts = *counts_ptr;
-        size_t pointers_to_models = NUM_MODELS * sizeof(uint64_t);
-        std::vector<uint8_t> enc_models(pointers_to_models, 0);
-        for (size_t i = 0; i < NUM_MODELS; i++) {
-            if (remap_models[i] == 0) { // we have to build this model if it exists
-                size_t model_offset = enc_models.size();
-                // (1) create the model
-                bool empty_model = ans_msb::create_enc_model(enc_models, counts[i]);
-                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(enc_models.data()) + i;
-                // (1) store offset of model data in byte stream
-                if (empty_model) {
-                    *model_offset_u64_ptr = 0;
-                } else {
-                    *model_offset_u64_ptr = model_offset;
-                }
-            }
-        }
+        size_t pointers_to_models = NUM_MODELS * sizeof(uint32_t);
+        size_t remap_table_size = NUM_MODELS * sizeof(uint32_t);
+        std::vector<uint8_t> enc_models(pointers_to_models + remap_table_size, 0);
 
-        // (2) adjust pointers to models
-        auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(enc_models.data());
+        // (1) copy the remap table
+        auto remap_table_ptr = reinterpret_cast<uint32_t*>(enc_models.data()) + NUM_MODELS;
         for (size_t i = 0; i < NUM_MODELS; i++) {
-            if (remap_models[i] != 0) {
-                model_offset_u64_ptr[i] = model_offset_u64_ptr[remap_models[i]];
+            remap_table_ptr[i] = remap_models[i];
+        }
+        // (2) create the models
+        for (size_t i = 0; i < NUM_MODELS; i++) {
+            size_t model_offset = enc_models.size();
+            // (1) create the model
+            bool empty_model = ans_msb::create_enc_model(enc_models, counts[i]);
+            auto model_offset_u32_ptr = reinterpret_cast<uint32_t*>(enc_models.data()) + i;
+            // (1) store offset of model data in byte stream
+            if (empty_model) {
+                *model_offset_u32_ptr = 0;
+            } else {
+                *model_offset_u32_ptr = model_offset;
             }
         }
 
@@ -291,8 +323,8 @@ struct ans_msb_model {
 
     static std::vector<uint8_t> create_dec_models(const std::vector<uint8_t>& enc_models_u8)
     {
-        auto enc_models = reinterpret_cast<const uint64_t*>(enc_models_u8.data());
-        size_t pointers_to_models = NUM_MODELS * sizeof(uint64_t);
+        auto enc_models = reinterpret_cast<const uint32_t*>(enc_models_u8.data());
+        size_t pointers_to_models = NUM_MODELS * sizeof(uint32_t);
         std::vector<uint8_t> dec_models_u8(pointers_to_models, 0);
         for (size_t i = 0; i < NUM_MODELS; i++) {
             size_t dec_model_offset = dec_models_u8.size();
@@ -302,10 +334,10 @@ struct ans_msb_model {
                 size_t model_size = dec_models_u8.size();
                 ans_msb::create_dec_model(dec_models_u8, *enc_model_ptr);
                 model_size = dec_models_u8.size() - model_size;
-                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
+                auto model_offset_u64_ptr = reinterpret_cast<uint32_t*>(dec_models_u8.data()) + i;
                 *model_offset_u64_ptr = dec_model_offset;
             } else {
-                auto model_offset_u64_ptr = reinterpret_cast<uint64_t*>(dec_models_u8.data()) + i;
+                auto model_offset_u64_ptr = reinterpret_cast<uint32_t*>(dec_models_u8.data()) + i;
                 *model_offset_u64_ptr = 0;
             }
         }
@@ -349,13 +381,17 @@ struct ans_msb_model {
         msb_block_header bh;
         bh.model_id = model_type::pick_model(in, n);
 
+        // (2) remap the model id
+        auto remap_table_ptr = reinterpret_cast<const uint32_t*>(enc_model_u8.data()) + NUM_MODELS;
+        bh.model_id = remap_table_ptr[bh.model_id];
+
         if (bh.model_id == 0) { // all 1s. continue
             model_type::write_block_header(bh, out);
             return;
         }
 
         // (2) reverse encode the block using the selected ANS model
-        auto model_ptrs = reinterpret_cast<const uint64_t*>(enc_model_u8.data());
+        auto model_ptrs = reinterpret_cast<const uint32_t*>(enc_model_u8.data());
         size_t model_offset = model_ptrs[bh.model_id];
         uint64_t state = 0;
         auto out_ptr = tmp_out_buf.data() + tmp_out_buf.size() - 1;
@@ -416,7 +452,7 @@ struct ans_msb_model {
         }
 
         size_t ans_enc_size = bh.num_ans_u32s * sizeof(uint32_t);
-        auto model_ptrs = reinterpret_cast<const uint64_t*>(dec_model_u8);
+        auto model_ptrs = reinterpret_cast<const uint32_t*>(dec_model_u8);
         size_t model_offset = model_ptrs[bh.model_id];
 
         // (0) init the decoder
