@@ -260,9 +260,12 @@ struct msb_model_med90p_2d_merged {
         for (size_t i = 0; i < NUM_MODELS; i++) {
             if (remapping[i] == 0 && model_entropy[i].second != 0) { // actual model at this pos?
                 remapping_final[i] = j;
-                for (size_t k = 0; k <= ans_msb::constants::MAX_VAL; k++) {
-                    counts[j][k] = counts[i][k];
-                    counts[i][k] = 0;
+                std::cout << "remap model " << i << " to " << j << std::endl;
+                if (i != j) {
+                    for (size_t k = 0; k <= ans_msb::constants::MAX_VAL; k++) {
+                        counts[j][k] = counts[i][k];
+                        counts[i][k] = 0;
+                    }
                 }
                 j++;
             }
@@ -389,8 +392,10 @@ struct ans_msb_model {
         bh.model_id = model_type::pick_model(in, n);
 
         // (2) remap the model id
+        // std::cout << "model_id = " << bh.model_id << " remap to ";
         auto remap_table_ptr = reinterpret_cast<const uint32_t*>(enc_model_u8.data()) + NUM_MODELS;
         bh.model_id = remap_table_ptr[bh.model_id];
+        // std::cout << bh.model_id << std::endl;
 
         if (bh.model_id == 0) { // all 1s. continue
             model_type::write_block_header(bh, out);
