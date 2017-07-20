@@ -205,9 +205,13 @@ struct msb_model_med90p_2d_merged {
     {
         auto counts_ptr = reinterpret_cast<ans_msb_counts_table*>(cntsu8.data());
         auto& counts = *counts_ptr;
-        std::vector<uint32_t> remapping(NUM_MODELS, 0);
+
+        // (0) 0-out the 0th model. as it is special
+        for (size_t k = 0; k <= ans_msb::constants::MAX_VAL; k++)
+            counts[0][k] = 0;
 
         // (1) compute entropy for each individual model
+        std::vector<uint32_t> remapping(NUM_MODELS, 0);
         std::vector<std::pair<double, uint64_t>> model_entropy(NUM_MODELS, { 0.0, 0 });
         size_t num_current_models = 0;
         for (size_t i = 0; i < NUM_MODELS; i++) {
@@ -301,9 +305,12 @@ struct ans_msb_model {
 
         // (1) copy the remap table
         auto remap_table_ptr = reinterpret_cast<uint32_t*>(enc_models.data()) + NUM_MODELS;
+        std::cout << "REMAP [";
         for (size_t i = 0; i < NUM_MODELS; i++) {
             remap_table_ptr[i] = remap_models[i];
+            std::cout << remap_models[i] << ",";
         }
+        std::cout << "]" << std::endl;
         // (2) create the models
         for (size_t i = 0; i < NUM_MODELS; i++) {
             size_t model_offset = enc_models.size();
