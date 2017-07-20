@@ -9,6 +9,10 @@ namespace quasi_succinct {
 struct block_size_stats {
     block_size_stats()
     {
+        last_overhead_bytes = 0;
+        small_overhead_bytes = 0;
+        full_overhead_bytes = 0;
+        total_overhead_bytes = 0;
         total_doc_bytes = 0;
         total_freq_bytes = 0;
         full_doc_bytes = 0;
@@ -28,7 +32,10 @@ struct block_size_stats {
             small_list_freq_postingsA[i] = 0;
         }
     }
-
+    uint64_t last_overhead_bytes;
+    uint64_t small_overhead_bytes;
+    uint64_t full_overhead_bytes;
+    uint64_t total_overhead_bytes;
     uint64_t total_doc_bytes;
     uint64_t total_freq_bytes;
     uint64_t full_doc_bytes;
@@ -47,6 +54,10 @@ struct block_size_stats {
     uint64_t small_list_freq_postingsA[128];
     block_size_stats& operator+=(const block_size_stats& rhs)
     {
+        this->last_overhead_bytes += rhs.last_overhead_bytes;
+        this->small_overhead_bytes += rhs.small_overhead_bytes;
+        this->full_overhead_bytes += rhs.full_overhead_bytes;
+        this->total_overhead_bytes += rhs.total_overhead_bytes;
         this->total_postings += rhs.total_postings;
         this->total_doc_bytes += rhs.total_doc_bytes;
         this->total_freq_bytes += rhs.total_freq_bytes;
@@ -71,6 +82,10 @@ struct block_size_stats {
 
 std::ostream& operator<<(std::ostream& o, const block_size_stats& stats)
 {
+    o << "full_overhead_bytes = " << stats.full_overhead_bytes << "\n";
+    o << "last_overhead_bytes = " << stats.last_overhead_bytes << "\n";
+    o << "small_overhead_bytes = " << stats.small_overhead_bytes << "\n";
+    o << "total_overhead_bytes = " << stats.total_overhead_bytes << "\n";
     o << "total_postings = " << stats.total_postings << "\n";
     o << "full_block_postings = " << stats.full_block_postings << "\n";
     o << "small_list_postings = " << stats.small_list_postings << "\n";
@@ -282,10 +297,17 @@ struct block_posting_list {
                 size_t freq_bytes = end_ptr - freq_ptr;
                 doc_ptr = end_ptr;
 
+                if (b == 0) {
+                    bss.total_overhead_bytes += sizeof(uint32_t); // block max only
+                } else {
+                    bss.total_overhead_bytes += 2 * sizeof(uint32_t); // block max and data offset
+                }
+
                 bss.total_doc_bytes += doc_bytes;
                 bss.total_freq_bytes += freq_bytes;
                 bss.total_postings += cur_block_size;
                 if (m_n < block_size) {
+                    bss.small_overhead_bytes += sizeof(uint32_t); // block max only
                     bss.small_list_doc_bytes = doc_bytes;
                     bss.small_list_freq_bytes = freq_bytes;
                     bss.small_list_postings = m_n;
@@ -295,10 +317,16 @@ struct block_posting_list {
                     bss.small_list_freq_bytesA[m_n] += freq_bytes;
                 } else {
                     if (cur_block_size < block_size) {
+                        bss.last_overhead_bytes += 2 * sizeof(uint32_t); // block max and data offset
                         bss.last_nonfull_doc_bytes = doc_bytes;
                         bss.last_nonfull_freq_bytes = freq_bytes;
                         bss.last_nonfull_postings = cur_block_size;
                     } else {
+                        if (b == 0) {
+                            bss.full_overhead_bytes += sizeof(uint32_t); // block max and data offset
+                        } else {
+                            bss.full_overhead_bytes += 2 * sizeof(uint32_t); // block max and data offset
+                        }
                         bss.full_doc_bytes += doc_bytes;
                         bss.full_freq_bytes += freq_bytes;
                         bss.full_block_postings += block_size;
