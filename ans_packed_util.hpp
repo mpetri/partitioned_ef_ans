@@ -368,7 +368,7 @@ static mag_table* normalize_counts(const mag_table* table)
     }
 
     if (!ans::is_power_of_two(M)) {
-        fprintf(stderr, "ERROR! not power of 2 after normalization = %llu\n", M);
+        std::cerr << "ERROR! not power of 2 after normalization = " << M << std::endl;
         exit(EXIT_FAILURE);
     }
 

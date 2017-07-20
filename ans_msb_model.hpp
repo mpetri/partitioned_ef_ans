@@ -166,33 +166,28 @@ struct msb_model_med90p_2d_merged {
         return model_id;
     }
 
-    typedef union morder {
-        struct {
-            uint32_t model_id : 6;
-            uint32_t final_state_bytes : 3;
-            uint32_t num_ans_u32s : 7;
-        };
-        uint16_t header;
-    } compact_header;
-
     static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out)
     {
-        compact_header ch;
-        ch.model_id = bh.model_id;
-        ch.final_state_bytes = bh.final_state_bytes - 1;
-        ch.num_ans_u32s = bh.num_ans_u32s;
-        out.push_back(ch.header >> 8);
-        out.push_back(ch.header & 0xFF);
+        if (bh.model_id == 0) {
+            out.push_back(0);
+        } else {
+            uint32_t header = (bh.model_id << 10) + ((bh.final_state_bytes - 1) << 7) + bh.num_ans_u32s;
+            out.push_back(header >> 8);
+            out.push_back(header & 0xFF);
+        }
     }
 
     static void read_block_header(msb_block_header& bh, uint8_t const*& in)
     {
-        compact_header ch;
-        ch.header = *in++;
-        ch.header = (ch.header << 8) + *in++;
-        bh.model_id = ch.model_id;
-        bh.final_state_bytes = ch.final_state_bytes + 1;
-        bh.num_ans_u32s = ch.num_ans_u32s;
+        uint8_t first_byte = *in++;
+        if (first_byte == 0) {
+            bh.model_id = 0;
+            return;
+        }
+        uint16_t header = (uint16_t(first_byte) << 8) + *in++;
+        bh.model_id = header >> 10;
+        bh.final_state_bytes = ((header >> 7) & 0x7) + 1;
+        bh.num_ans_u32s = header & 0x3F;
     }
 
     struct combine_cost {
@@ -441,8 +436,7 @@ struct ans_msb_model {
         uint32_t sum_of_values, size_t n, uint8_t const* dec_model_u8)
     {
         if (sum_of_values == 0) {
-            for (size_t i = 0; i < n; i++)
-                out[i] = 0;
+            memset(out, 0, sizeof(uint32_t) * n);
             return in;
         }
         if (sum_of_values != uint32_t(-1) && n <= ans_msb::constants::VBYTE_THRESHOLD) {
@@ -458,8 +452,7 @@ struct ans_msb_model {
 
         // uniform block
         if (bh.model_id == 0) {
-            for (size_t i = 0; i < n; i++)
-                out[i] = 0;
+            memset(out, 0, sizeof(uint32_t) * n);
             return in;
         }
 

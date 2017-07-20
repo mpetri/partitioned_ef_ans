@@ -264,7 +264,7 @@ std::vector<uint64_t> normalize_freqs(const counts& freqs, size_t target_power)
         M += nfreqs[i];
     }
     if (!ans::is_power_of_two(M)) {
-        fprintf(stderr, "ERROR! not power of 2 after normalization = %llu", M);
+        std::cerr << "ERROR! not power of 2 after normalization = " << M << std::endl;
         exit(EXIT_FAILURE);
     }
     return nfreqs;
