@@ -76,14 +76,33 @@ void get_size_stats(quasi_succinct::freq_index<DocsSequence, FreqsSequence>& col
     }
 }
 
+template <typename DocsSequence, typename FreqsSequence>
+void print_size_stats(quasi_succinct::freq_index<DocsSequence, FreqsSequence>&, std::string)
+{
+}
+
 template <typename BlockCodec>
-void print_size_stats(quasi_succinct::block_freq_index<BlockCodec>& coll)
+void print_size_stats(quasi_succinct::block_freq_index<BlockCodec>& coll, std::string type)
 {
     quasi_succinct::block_size_stats stats;
     for (size_t i = 0; i < coll.size(); ++i) {
         stats += coll[i].size_stats();
     }
     std::cout << stats;
+
+    size_t end_points_size = 0;
+    auto size_tree = succinct::mapper::size_tree_of(coll);
+    size_tree->dump();
+    for (auto const& node : size_tree->children) {
+        if (node->name == "m_endpoints") {
+            end_points_size = node->size;
+        }
+    }
+
+    size_t full_metadata_bytes = stats.full_overhead_bytes + end_points_size;
+    std::cout << type << ";FULL_META_BYTES;" << full_metadata_bytes << ";" << stats.full_block_postings << std::endl;
+    std::cout << type << ";FULL_DOC_BYTES;" << stats.full_doc_bytes << ";" << stats.full_block_postings << std::endl;
+    std::cout << type << ";FULL_FREQ_BYTES;" << stats.full_freq_bytes << ";" << stats.full_block_postings << std::endl;
 }
 
 template <typename BlockCodec>
@@ -98,18 +117,40 @@ void get_size_stats(quasi_succinct::block_freq_index<BlockCodec>& coll,
         freqs_size += coll[i].stats_freqs_size();
     }
     docs_size = total_size - freqs_size;
-
-    print_size_stats(coll);
 }
 
 template <typename t_ans_model>
-void print_size_stats(quasi_succinct::ans_block_freq_index<t_ans_model>& coll)
+void print_size_stats(quasi_succinct::ans_block_freq_index<t_ans_model>& coll, std::string type)
 {
     quasi_succinct::ans_block_size_stats stats;
     for (size_t i = 0; i < coll.size(); ++i) {
         stats += coll[i].size_stats();
     }
     std::cout << stats;
+
+    size_t end_points_size = 0;
+    size_t doc_model_size = 0;
+    size_t freq_model_size = 0;
+    auto size_tree = succinct::mapper::size_tree_of(coll);
+    size_tree->dump();
+    for (auto const& node : size_tree->children) {
+        if (node->name == "m_endpoints") {
+            end_points_size = node->size;
+        }
+        if (node->name == "m_doc_dec_model") {
+            doc_model_size = node->size;
+        }
+        if (node->name == "m_freq_dec_model") {
+            freq_model_size = node->size;
+        }
+    }
+
+    size_t full_metadata_bytes = stats.full_overhead_bytes + end_points_size;
+    size_t full_doc_bytes = stats.full_doc_bytes + doc_model_size;
+    size_t full_freq_bytes = stats.full_freq_bytes + freq_model_size;
+    std::cout << type << ";FULL_META_BYTES;" << full_metadata_bytes << ";" << stats.full_block_postings << std::endl;
+    std::cout << type << ";FULL_DOC_BYTES;" << full_doc_bytes << ";" << stats.full_block_postings << std::endl;
+    std::cout << type << ";FULL_FREQ_BYTES;" << full_freq_bytes << ";" << stats.full_block_postings << std::endl;
 }
 
 template <typename t_ans_model>
@@ -124,8 +165,6 @@ void get_size_stats(quasi_succinct::ans_block_freq_index<t_ans_model>& coll,
         freqs_size += coll[i].stats_freqs_size();
     }
     docs_size = total_size - freqs_size;
-
-    print_size_stats(coll);
 }
 
 template <typename Collection>
@@ -255,6 +294,7 @@ void create_collection(InputCollection const& input,
 
     stats_line()("type", seq_type)("worker_threads", configuration::get().worker_threads)("construction_time", elapsed_secs)("construction_user_time", user_elapsed_secs);
 
+    print_size_stats(coll, seq_type);
     dump_stats(coll, seq_type, plog.postings);
     dump_index_specific_stats(coll, seq_type);
 
