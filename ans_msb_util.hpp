@@ -124,10 +124,10 @@ struct enc_model {
 #pragma pack(1)
 struct dec_table_entry {
     uint16_t freq;
-    uint16_t except_bytes;
-    uint64_t offset;
+    uint8_t except_bytes;
+    uint16_t offset;
     uint32_t mapped_num;
-    uint64_t except_mask;
+    uint32_t except_mask;
 };
 
 struct dec_model {
@@ -168,8 +168,8 @@ uint32_t exception_bytes(uint32_t x)
 uint32_t undo_mapping(const dec_table_entry& entry, const uint8_t*& except_ptr)
 {
     auto except_u32 = reinterpret_cast<const uint32_t*>(except_ptr);
-    uint64_t except_u64 = (*except_u32);
-    uint32_t num = entry.mapped_num + (except_u64 & entry.except_mask);
+    uint32_t except_u32n = (*except_u32);
+    uint32_t num = entry.mapped_num + (except_u32n & entry.except_mask);
     except_ptr += entry.except_bytes;
     return num;
 }
