@@ -1,10 +1,10 @@
 
 #include <algorithm>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <fstream>
 
 #include "libstemmer.h"
 
@@ -21,7 +21,10 @@ po::variables_map parse_cmdargs(int argc, char const* argv[])
     desc.add_options()
         ("help,h", "produce help message")
         ("query-file,q",po::value<std::string>()->required(), "input query file")
-        ("term-file,t",po::value<std::string>()->required(), "collection term->id file");
+        ("out-file,o",po::value<std::string>()->required(), "out file 1")
+        ("out-file2,q",po::value<std::string>()->required(), "out file 2")
+        ("term-file,t",po::value<std::string>()->required(), "collection term->id file")
+        ("uterm-file,u",po::value<std::string>()->required(), "collection term->id file2");
     // clang-format on
     try {
         po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -80,7 +83,12 @@ parse_term_file(std::string term_file)
     return tm;
 }
 
-std::vector<std::vector<std::string>>
+struct qry_term {
+    std::string original;
+    std::string stemmed;
+};
+
+std::vector<std::vector<qry_term>>
 stem_queries(const std::vector<std::vector<std::string>>& unstemmed_queries)
 {
     struct sb_stemmer* stemmer = sb_stemmer_new("porter", NULL);
@@ -89,16 +97,19 @@ stem_queries(const std::vector<std::vector<std::string>>& unstemmed_queries)
         exit(1);
     }
 
-    std::vector<std::vector<std::string>> stemmed_queries;
+    std::vector<std::vector<qry_term>> stemmed_queries;
     for (const auto& qry : unstemmed_queries) {
-        std::vector<std::string> sq;
+        std::vector<qry_term> sq;
         for (const auto& tok : qry) {
             std::string ttok = tok;
             std::transform(ttok.begin(), ttok.end(), ttok.begin(), ::tolower);
             const char* stemmed = (const char*)sb_stemmer_stem(stemmer, (const sb_symbol*)ttok.c_str(), ttok.size());
             std::string stok(stemmed);
             if (!stok.empty()) {
-                sq.push_back(stok);
+                qry_term q;
+                q.original = ttok;
+                q.stemmed = stok;
+                sq.push_back(q);
             }
         }
         if (sq.size()) {
@@ -110,22 +121,36 @@ stem_queries(const std::vector<std::vector<std::string>>& unstemmed_queries)
     return stemmed_queries;
 }
 
-std::vector<std::vector<uint64_t>>
-map_queries(const std::vector<std::vector<std::string>>& stemmed_queries,
-    const std::unordered_map<std::string, uint64_t>& tm)
+struct mapped_token {
+    uint64_t first;
+    uint64_t second;
+};
+
+std::vector<std::vector<mapped_token>>
+map_queries(const std::vector<std::vector<qry_term>>& stemmed_queries,
+    const std::unordered_map<std::string, uint64_t>& tm,
+    const std::unordered_map<std::string, uint64_t>& utm)
 {
     uint64_t num_skipped = 0;
-    std::vector<std::vector<uint64_t>> mapped_queries;
+    std::vector<std::vector<mapped_token>> mapped_queries;
     for (const auto& qry : stemmed_queries) {
-        std::vector<uint64_t> mq;
+        std::vector<mapped_token> mq;
         bool skip = false;
-        for (const auto& tok : qry) {
-            auto itr = tm.find(tok);
-            if (itr == tm.end()) {
-                std::cerr << "Could not map token '" << tok << "'. skipping query." << std::endl;
-                skip = true;
+        for (size_t i = 0; i < qry.size(); i++) {
+            auto qt = qry[i];
+            auto itr = tm.find(qt.stemmed);
+            if (itr != tm.end()) {
+                auto uitr = utm.find(qt.original);
+                if (uitr != utm.end()) {
+                    mapped_token mt;
+                    mt.first = itr->second;
+                    mt.second = uitr->second;
+                    mq.push_back(mt);
+                } else {
+                    skip = true;
+                }
             } else {
-                mq.push_back(itr->second);
+                skip = true;
             }
         }
         if (!skip) {
@@ -144,21 +169,30 @@ int main(int argc, const char** argv)
     auto cmdargs = parse_cmdargs(argc, argv);
     auto query_file = cmdargs["query-file"].as<std::string>();
     auto term_file = cmdargs["term-file"].as<std::string>();
+    auto uterm_file = cmdargs["uterm-file"].as<std::string>();
+    auto out_file = cmdargs["out-file"].as<std::string>();
+    auto out_file2 = cmdargs["out-file2"].as<std::string>();
 
     //(1) parse inputs
     auto unstemmed_queries = parse_query_file(query_file);
     auto term_map = parse_term_file(term_file);
+    auto uterm_map = parse_term_file(uterm_file);
 
     // (2) stem using porter stemmer
     auto stemmed_queries = stem_queries(unstemmed_queries);
 
     // (3) map to collection ids
-    auto mapped_queries = map_queries(stemmed_queries, term_map);
+    auto mapped_queries = map_queries(stemmed_queries, term_map, uterm_map);
 
     // (4) output to stdout
+    std::ofstream ofs1(out_file);
+    std::ofstream ofs2(out_file2);
     for (const auto& q : mapped_queries) {
-        for (size_t i = 0; i < q.size() - 1; i++)
-            std::cout << q[i] << "\t";
-        std::cout << q.back() << std::endl;
+        for (size_t i = 0; i < q.size() - 1; i++) {
+            ofs1 << q[i].first << "\t";
+            ofs2 << q[i].second << "\t";
+        }
+        ofs1 << q.back().first << std::endl;
+        ofs2 << q.back().second << std::endl;
     }
 }
