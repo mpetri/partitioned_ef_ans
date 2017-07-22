@@ -22,7 +22,7 @@ po::variables_map parse_cmdargs(int argc, char const* argv[])
         ("help,h", "produce help message")
         ("query-file,q",po::value<std::string>()->required(), "input query file")
         ("out-file,o",po::value<std::string>()->required(), "out file 1")
-        ("out-file2,q",po::value<std::string>()->required(), "out file 2")
+        ("out-file2,O",po::value<std::string>()->required(), "out file 2")
         ("term-file,t",po::value<std::string>()->required(), "collection term->id file")
         ("uterm-file,u",po::value<std::string>()->required(), "collection term->id file2");
     // clang-format on
