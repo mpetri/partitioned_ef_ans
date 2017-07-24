@@ -361,14 +361,13 @@ uint64_t encode_num(const enc_model& model, uint64_t state, uint32_t num, uint8_
     return next;
 }
 
-const dec_table_entry& decode_num(const dec_model& model, uint64_t& state, const uint8_t*& in, size_t& enc_size, uint64_t& num_renorms)
+const dec_table_entry& decode_num(const dec_model& model, uint64_t& state, const uint8_t*& in, size_t& enc_size)
 {
     uint64_t state_mod_M = state & model.MASK_M;
     const auto& entry = model.table[state_mod_M];
     state = entry.freq * (state >> model.LOG2_M) + entry.offset;
     if (enc_size && state < ans_msb::constants::NORM_LOWER_BOUND) {
         ans::input_unit<ans::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
-        num_renorms++;
     }
     return entry;
 }

@@ -565,18 +565,18 @@ struct ans_msb_model {
     decode(uint8_t const* in, uint32_t* out,
         uint32_t sum_of_values, size_t n, uint8_t const* dec_model_u8)
     {
-        bool is_freq_decode = sum_of_values == uint32_t(-1);
-        auto& dec_stats = ans_dec_stats::stats(is_freq_decode);
+        // bool is_freq_decode = sum_of_values == uint32_t(-1);
+        // auto& dec_stats = ans_dec_stats::stats(is_freq_decode);
 
         if (sum_of_values == 0) {
             memset(out, 0, sizeof(uint32_t) * n);
-            dec_stats.num_no_decodes++;
-            dec_stats.postings_no_decodes += n;
+            // dec_stats.num_no_decodes++;
+            // dec_stats.postings_no_decodes += n;
             return in;
         }
         if (sum_of_values != uint32_t(-1) && n <= ans_msb::constants::VBYTE_THRESHOLD) {
-            dec_stats.num_no_decodes++;
-            dec_stats.postings_no_decodes += n;
+            // dec_stats.num_no_decodes++;
+            // dec_stats.postings_no_decodes += n;
             if (n == 1) {
                 *out = sum_of_values;
                 return in;
@@ -590,15 +590,15 @@ struct ans_msb_model {
         // uniform block
         if (bh.model_id == 0) {
             memset(out, 0, sizeof(uint32_t) * n);
-            dec_stats.num_no_decodes++;
-            dec_stats.postings_no_decodes += n;
+            // dec_stats.num_no_decodes++;
+            // dec_stats.postings_no_decodes += n;
             return in;
         }
 
-        dec_stats.num_model_decodes++;
-        dec_stats.postings_model_decodes += n;
-        dec_stats.model_usage[bh.model_id]++;
-        dec_stats.final_state_bytes[bh.final_state_bytes]++;
+        // dec_stats.num_model_decodes++;
+        // dec_stats.postings_model_decodes += n;
+        // dec_stats.model_usage[bh.model_id]++;
+        // dec_stats.final_state_bytes[bh.final_state_bytes]++;
 
         size_t ans_enc_size = bh.num_ans_u32s * sizeof(uint32_t);
         auto model_ptrs = reinterpret_cast<const uint32_t*>(dec_model_u8);
@@ -610,22 +610,22 @@ struct ans_msb_model {
         // (1) decode the ans parts and the exceptions at the same time
         auto except_ptr = in + ans_enc_size;
         auto cur_model = reinterpret_cast<const ans_msb::dec_model*>(dec_model_u8 + model_offset);
-        dec_stats.model_frame_size[bh.model_id] = cur_model->M;
-        uint64_t num_renorms = 0;
-        uint64_t renorm_int = 1;
+        // dec_stats.model_frame_size[bh.model_id] = cur_model->M;
+        // uint64_t num_renorms = 0;
+        // uint64_t renorm_int = 1;
         for (size_t k = 0; k < n; k++) {
-            uint64_t prev_renorm = num_renorms;
-            const auto& dec_entry = decode_num(*cur_model, state, in, ans_enc_size, num_renorms);
-            if (num_renorms != prev_renorm) {
-                dec_stats.min_renorm_interval[bh.model_id] = std::min(renorm_int, dec_stats.min_renorm_interval[bh.model_id]);
-                renorm_int = 1;
-            } else {
-                renorm_int++;
-            }
-            prev_renorm = num_renorms;
+            // uint64_t prev_renorm = num_renorms;
+            const auto& dec_entry = decode_num(*cur_model, state, in, ans_enc_size);
+            // if (num_renorms != prev_renorm) {
+            //     dec_stats.min_renorm_interval[bh.model_id] = std::min(renorm_int, dec_stats.min_renorm_interval[bh.model_id]);
+            //     renorm_int = 1;
+            // } else {
+            //     renorm_int++;
+            // }
+            // prev_renorm = num_renorms;
             *out++ = ans_msb::undo_mapping(dec_entry, except_ptr) - 1;
         }
-        dec_stats.ans_renorms_per_block[bh.model_id] += num_renorms;
+        // dec_stats.ans_renorms_per_block[bh.model_id] += num_renorms;
         return except_ptr;
     }
 };
