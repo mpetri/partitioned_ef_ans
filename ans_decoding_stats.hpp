@@ -20,13 +20,13 @@ struct ans_dec_stats {
     }
     static ans_dec_stats& doc_stats()
     {
-        static ans_dec_stats s;
-        return s;
+        static std::unique_ptr<ans_dec_stats> s(new ans_dec_stats);
+        return *s.get();
     }
     static ans_dec_stats& freq_stats()
     {
-        static ans_dec_stats s;
-        return s;
+        static std::unique_ptr<ans_dec_stats> s(new ans_dec_stats);
+        return *s.get();
     }
     static ans_dec_stats& stats(bool is_freq)
     {
