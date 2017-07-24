@@ -42,9 +42,10 @@ struct ans_dec_stats {
         std::cout << "postings_no_decodes = " << s.postings_no_decodes << std::endl;
         std::cout << "num_model_decodes = " << s.num_model_decodes << std::endl;
         std::cout << "postings_model_decodes = " << s.postings_model_decodes << std::endl;
+        size_t non_zero = 0;
         for (size_t i = 0; i < 256; i++) {
             if (s.model_usage[i] != 0) {
-                std::cout << "model_id = " << i << " M = " << s.model_frame_size[i]
+                std::cout << non_zero++ << " model_id = " << i << " M = " << s.model_frame_size[i]
                           << " usage = " << s.model_usage[i]
                           << " percent = " << 100.0 * double(s.model_usage[i]) / double(s.num_model_decodes)
                           << " renorms = " << s.ans_renorms_per_block[i]
