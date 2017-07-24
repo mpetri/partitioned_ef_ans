@@ -483,8 +483,17 @@ struct ans_msb_model {
         auto cur_model = reinterpret_cast<const ans_msb::dec_model*>(dec_model_u8 + model_offset);
         dec_stats.model_frame_size[bh.model_id] = cur_model->M;
         uint64_t num_renorms = 0;
+        uint64_t renorm_int = 1;
         for (size_t k = 0; k < n; k++) {
+            uint64_t prev_renorm = num_renorms;
             const auto& dec_entry = decode_num(*cur_model, state, in, ans_enc_size, num_renorms);
+            if (num_renorms != prev_renorm) {
+                dec_stats.min_renorm_interval[bh.model_id] = std::min(renorm_int, dec_stats.min_renorm_interval[bh.model_id]);
+                renorm_int = 1;
+            } else {
+                renorm_int++;
+            }
+            prev_renorm = num_renorms;
             *out++ = ans_msb::undo_mapping(dec_entry, except_ptr) - 1;
         }
         dec_stats.ans_renorms_per_block[bh.model_id] += num_renorms;
