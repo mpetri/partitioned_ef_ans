@@ -11,8 +11,13 @@ struct ans_dec_stats {
     uint64_t model_usage[256] = { 0 };
     uint64_t model_frame_size[256] = { 0 };
     uint64_t ans_renorms_per_block[256] = { 0 };
-    uint64_t min_renorm_interval[256] = { 255 };
+    uint64_t min_renorm_interval[256];
     uint64_t final_state_bytes[8] = { 0 };
+    ans_dec_stats()
+    {
+        for (size_t i = 0; i < 256; i++)
+            min_renorm_interval[i] = 255;
+    }
     static ans_dec_stats& doc_stats()
     {
         static ans_dec_stats s;
