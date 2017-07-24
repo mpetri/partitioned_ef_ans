@@ -277,6 +277,135 @@ struct msb_model_med90p_2d_merged {
     }
 };
 
+struct msb_model_medmax_2d_merged {
+    static const uint32_t NUM_MODELS = 16 * 16;
+    static const uint32_t MAX_NUM_MODELS = 63;
+    using ans_msb_counts_table = ans_msb::counts[NUM_MODELS];
+    static uint32_t pick_model(uint32_t const* in, size_t n)
+    {
+        static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
+            10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
+        static std::vector<uint32_t> buf(ans::constants::BLOCK_SIZE);
+        std::copy(in, in + n, buf.begin());
+        std::sort(buf.begin(), buf.begin() + n);
+        uint32_t mag_med = ans::magnitude(buf[n / 2] + 1);
+        uint32_t mag_max = ans::magnitude(buf[n - 1] + 1);
+        uint32_t model_id = (MAG2SEL[mag_max] << 4) + MAG2SEL[mag_med];
+        if (model_id == 0 && buf[n - 1] != 0)
+            model_id++;
+        return model_id;
+    }
+
+    static void write_block_header(const msb_block_header& bh, std::vector<uint8_t>& out)
+    {
+        if (bh.model_id == 0) {
+            out.push_back(0);
+        } else {
+            uint32_t header = (bh.model_id << 10) + ((bh.final_state_bytes - 1) << 7) + bh.num_ans_u32s;
+            out.push_back(header >> 8);
+            out.push_back(header & 0xFF);
+        }
+    }
+
+    static void read_block_header(msb_block_header& bh, uint8_t const*& in)
+    {
+        uint8_t first_byte = *in++;
+        if (first_byte == 0) {
+            bh.model_id = 0;
+            return;
+        }
+        uint16_t header = (uint16_t(first_byte) << 8) + *in++;
+        bh.model_id = header >> 10;
+        bh.final_state_bytes = ((header >> 7) & 0x7) + 1;
+        bh.num_ans_u32s = header & 0x3F;
+    }
+
+    struct combine_cost {
+        double H_a;
+        double H_b;
+    };
+
+    static std::vector<uint32_t>
+    condense_models(std::vector<uint8_t>& cntsu8)
+    {
+        auto counts_ptr = reinterpret_cast<ans_msb_counts_table*>(cntsu8.data());
+        auto& counts = *counts_ptr;
+
+        // (0) 0-out the 0th model. as it is special
+        for (size_t k = 0; k <= ans_msb::constants::MAX_VAL; k++)
+            counts[0][k] = 0;
+
+        // (1) compute entropy for each individual model
+        std::vector<uint32_t> remapping(NUM_MODELS, 0);
+        std::vector<std::pair<double, uint64_t>> model_entropy(NUM_MODELS, { 0.0, 0 });
+        size_t num_current_models = 0;
+        for (size_t i = 0; i < NUM_MODELS; i++) {
+            model_entropy[i] = ans_msb::compute_entropy(counts[i]);
+            if (model_entropy[i].second != 0)
+                num_current_models++;
+        }
+
+        // (2) merge the best models to reduce the total number of models
+        std::vector<std::pair<uint64_t, uint64_t>> merge_ops;
+        std::cout << "num_current_models = " << num_current_models << " target = " << MAX_NUM_MODELS << std::endl;
+        while (num_current_models > MAX_NUM_MODELS) {
+            // (a) compute all pairs
+            auto min_pair = ans_msb::find_min_pair(counts, NUM_MODELS, model_entropy);
+
+            // (b) remove one model and change the other
+            ans_msb::merge_models(counts, model_entropy, min_pair.first, min_pair.second);
+
+            // (c) keep track of what has moved where
+            merge_ops.push_back(min_pair);
+
+            num_current_models--;
+        }
+
+        // (3) create the remapping
+        auto itr = merge_ops.rbegin();
+        auto end = merge_ops.rend();
+        while (itr != end) {
+            auto op = *itr;
+            auto from = op.first;
+            auto to = op.second;
+            std::cout << "process op from=" << from << " to=" << to << std::endl;
+            if (remapping[to] != 0)
+                to = remapping[to];
+            remapping[from] = to;
+            std::cout << "apply op from=" << from << " to=" << to << std::endl;
+            ++itr;
+        }
+
+        // (4) to make the model ids small we have to remap
+        //     to [1,63] and adjust the remapping again!
+        std::vector<uint32_t> remapping_final(NUM_MODELS, 0);
+
+        // (a) move the models into the right place
+        size_t j = 1; // 0 is a reserved selector
+        for (size_t i = 0; i < NUM_MODELS; i++) {
+            if (remapping[i] == 0 && model_entropy[i].second != 0) { // actual model at this pos?
+                remapping_final[i] = j;
+                std::cout << "remap model " << i << " to " << j << std::endl;
+                if (i != j) {
+                    for (size_t k = 0; k <= ans_msb::constants::MAX_VAL; k++) {
+                        counts[j][k] = counts[i][k];
+                        counts[i][k] = 0;
+                    }
+                }
+                j++;
+            }
+        }
+        // (b) fix the redirects
+        for (size_t i = 0; i < NUM_MODELS; i++) {
+            if (remapping[i] != 0) { // model redirect
+                remapping_final[i] = remapping_final[remapping[i]];
+            }
+        }
+
+        return remapping_final;
+    }
+};
+
 namespace quasi_succinct {
 
 template <typename model_type>
