@@ -11,6 +11,8 @@
 #include "ans_util.hpp"
 #include "block_codecs.hpp"
 
+#define COMPACT_DEC_TABLE 1
+
 struct msb_block_header {
     uint32_t model_id = 0;
     uint32_t final_state_bytes = 0;
@@ -467,7 +469,11 @@ struct ans_msb_model {
                 size_t enc_model_offset = enc_models[i];
                 auto enc_model_ptr = reinterpret_cast<const ans_msb::enc_model*>(enc_models_u8.data() + enc_model_offset);
                 size_t model_size = dec_models_u8.size();
+#ifdef COMPACT_DEC_TABLE
+                ans_msb::create_dec_model_compact(dec_models_u8, *enc_model_ptr);
+#else
                 ans_msb::create_dec_model(dec_models_u8, *enc_model_ptr);
+#endif
                 model_size = dec_models_u8.size() - model_size;
                 auto model_offset_u64_ptr = reinterpret_cast<uint32_t*>(dec_models_u8.data()) + i;
                 *model_offset_u64_ptr = dec_model_offset;
@@ -609,13 +615,23 @@ struct ans_msb_model {
 
         // (1) decode the ans parts and the exceptions at the same time
         auto except_ptr = in + ans_enc_size;
+#ifdef COMPACT_DEC_TABLE
+        auto cur_model = reinterpret_cast<const ans_msb::dec_model_small*>(dec_model_u8 + model_offset);
+        auto cur_sym_table = reinterpret_cast<const ans_msb::dec_table_entry_small*>(cur_model->table_data);
+        auto dec_sym_table_ptr = reinterpret_cast<const ans_msb::dec_table_entry_small_sym*>(cur_model->table_data + cur_model->M * sizeof(ans_msb::dec_table_entry_small));
+#else
         auto cur_model = reinterpret_cast<const ans_msb::dec_model*>(dec_model_u8 + model_offset);
+#endif
         // dec_stats.model_frame_size[bh.model_id] = cur_model->M;
         // uint64_t num_renorms = 0;
         // uint64_t renorm_int = 1;
         for (size_t k = 0; k < n; k++) {
-            // uint64_t prev_renorm = num_renorms;
+// uint64_t prev_renorm = num_renorms;
+#ifdef COMPACT_DEC_TABLE
+            const auto& dec_entry = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
+#else
             const auto& dec_entry = decode_num(*cur_model, state, in, ans_enc_size);
+#endif
             // if (num_renorms != prev_renorm) {
             //     dec_stats.min_renorm_interval[bh.model_id] = std::min(renorm_int, dec_stats.min_renorm_interval[bh.model_id]);
             //     renorm_int = 1;

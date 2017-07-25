@@ -131,11 +131,32 @@ struct dec_table_entry {
     uint32_t except_mask;
 };
 
+#pragma pack(1)
+struct dec_table_entry_small {
+    uint16_t offset;
+    uint16_t sym_offset;
+};
+
+#pragma pack(1)
+struct dec_table_entry_small_sym {
+    uint16_t freq;
+    uint8_t except_bytes;
+    uint32_t mapped_num;
+    uint32_t except_mask;
+};
+
 struct dec_model {
     uint64_t M;
     uint64_t MASK_M;
     uint64_t LOG2_M;
     dec_table_entry table[0];
+};
+
+struct dec_model_small {
+    uint64_t M;
+    uint64_t MASK_M;
+    uint64_t LOG2_M;
+    uint8_t table_data[0];
 };
 
 uint16_t mapping(uint32_t x)
@@ -166,7 +187,8 @@ uint32_t exception_bytes(uint32_t x)
     return 3;
 }
 
-uint32_t undo_mapping(const dec_table_entry& entry, const uint8_t*& except_ptr)
+template <class t_entry>
+uint32_t undo_mapping(const t_entry& entry, const uint8_t*& except_ptr)
 {
     auto except_u32 = reinterpret_cast<const uint32_t*>(except_ptr);
     uint32_t except_u32n = (*except_u32);
@@ -181,7 +203,6 @@ uint16_t mapping_and_exceptions(uint32_t x, uint8_t*& except_out)
         return x;
     if (x <= (1 << 16)) {
         // one exception byte
-        // std::cout << "x = " << x << " exception byte = " << (x & 0xFF) << std::endl;
         *except_out-- = x & 0xFF;
         return (x >> 8) + 256;
     }
@@ -291,12 +312,7 @@ bool create_enc_model(std::vector<uint8_t>& enc_models, const counts& cnts)
         target_PTWO = ans::next_power_of_two(target_PTWO);
 
     // (1) normalize the counts
-    // std::cout << "unique syms = " << uniq_syms << std::endl;
-    // std::cout << "actual counts = " << std::endl;
-    // print_cnts(cnts);
     auto norm_counts = ans_msb::normalize_freqs(cnts, target_PTWO);
-    // std::cout << "normalized counts = " << std::endl;
-    // print_cnts(norm_counts);
 
     // (2) create the encoding model
     size_t model_size = sizeof(ans_msb::enc_model) + (constants::MAX_VAL + 1) * sizeof(enc_table_entry);
@@ -349,6 +365,48 @@ void create_dec_model(std::vector<uint8_t>& dec_models, const ans_msb::enc_model
     dec_models.insert(dec_models.end(), new_model.begin(), new_model.end());
 }
 
+void create_dec_model_compact(std::vector<uint8_t>& dec_models, const ans_msb::enc_model& enc_model)
+{
+    // (0) determine num uniq syms
+    uint64_t num_uniq_syms = 0;
+    for (size_t j = 0; j <= constants::MAX_VAL; j++) {
+        num_uniq_syms += (enc_model.table[j].freq != 0);
+    }
+
+    // (1) determine model size
+    size_t model_size = sizeof(ans_msb::dec_model) + enc_model.M * sizeof(dec_table_entry_small)
+        + num_uniq_syms * sizeof(dec_table_entry_small_sym);
+    std::vector<uint8_t> new_model(model_size);
+    auto model_ptr = reinterpret_cast<ans_msb::dec_model_small*>(new_model.data());
+    auto& model = *model_ptr;
+
+    model.M = enc_model.M;
+    model.LOG2_M = log2(enc_model.M);
+    model.MASK_M = model.M - 1;
+    auto dec_table_ptr = reinterpret_cast<dec_table_entry_small*>(model.table_data);
+    auto dec_sym_table_ptr = reinterpret_cast<dec_table_entry_small_sym*>(model.table_data + enc_model.M * sizeof(dec_table_entry_small));
+
+    // (2) create csum table for decoding
+    size_t base = 0;
+    size_t sym_offset = 0;
+    for (size_t j = 0; j <= constants::MAX_VAL; j++) {
+        auto cur_freq = enc_model.table[j].freq;
+        if (cur_freq) {
+            dec_sym_table_ptr[sym_offset].mapped_num = undo_mapping(j);
+            dec_sym_table_ptr[sym_offset].except_bytes = exception_bytes(j);
+            dec_sym_table_ptr[sym_offset].except_mask = (1ULL << (dec_sym_table_ptr[sym_offset].except_bytes << 3)) - 1;
+            dec_sym_table_ptr[sym_offset].freq = cur_freq;
+            sym_offset++;
+        }
+        for (size_t k = 0; k < cur_freq; k++) {
+            dec_table_ptr[base + k].sym_offset = sym_offset - 1;
+            dec_table_ptr[base + k].offset = k;
+        }
+        base += cur_freq;
+    }
+    dec_models.insert(dec_models.end(), new_model.begin(), new_model.end());
+}
+
 uint64_t encode_num(const enc_model& model, uint64_t state, uint32_t num, uint8_t*& out)
 {
     const auto& entry = model.table[num];
@@ -370,5 +428,18 @@ const dec_table_entry& decode_num(const dec_model& model, uint64_t& state, const
         ans::input_unit<ans::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
     }
     return entry;
+}
+
+const dec_table_entry_small_sym& decode_num_compact(const dec_model_small& model,
+    const dec_table_entry_small* table, const dec_table_entry_small_sym* sym_table, uint64_t& state, const uint8_t*& in, size_t& enc_size)
+{
+    uint64_t state_mod_M = state & model.MASK_M;
+    const auto& entry = table[state_mod_M];
+    const auto& sym_entry = sym_table[entry.sym_offset];
+    state = sym_entry.freq * (state >> model.LOG2_M) + entry.offset;
+    if (enc_size && state < ans_msb::constants::NORM_LOWER_BOUND) {
+        ans::input_unit<ans::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
+    }
+    return sym_entry;
 }
 }
