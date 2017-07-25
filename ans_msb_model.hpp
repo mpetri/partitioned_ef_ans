@@ -606,7 +606,7 @@ struct ans_msb_model {
         if (cur_model_ptr->model_type == 0) {
             const auto& cur_model = *cur_model_ptr;
             for (size_t k = 0; k < n; k++) {
-                *out++ = decode_num_fast(cur_model, state, in, ans_enc_size) - 1;
+                *out++ = decode_num_fast(cur_model, state, in, ans_enc_size);
             }
         } else {
             auto compact_model_ptr = reinterpret_cast<const ans_msb::dec_model_compact*>(dec_model_u8 + model_offset);

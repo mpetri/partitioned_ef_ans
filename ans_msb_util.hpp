@@ -366,7 +366,7 @@ void create_dec_model_fast(std::vector<uint8_t>& dec_models, const ans_msb::enc_
     for (size_t j = 0; j <= enc_model.max_value; j++) {
         auto cur_freq = enc_model.table[j].freq;
         for (size_t k = 0; k < cur_freq; k++) {
-            model.table[base + k].num = j;
+            model.table[base + k].num = j - 1;
             model.table[base + k].freq = cur_freq;
             model.table[base + k].offset = k;
         }
