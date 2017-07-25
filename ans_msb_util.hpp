@@ -119,6 +119,7 @@ std::ostream& operator<<(std::ostream& os, const enc_table_entry& t)
 
 struct enc_model {
     uint64_t M;
+    uint32_t max_value;
     enc_table_entry table[0];
 };
 
@@ -302,9 +303,12 @@ bool create_enc_model(std::vector<uint8_t>& enc_models, const counts& cnts)
 
     // (1) find a target power of 2
     uint64_t uniq_syms = 0;
+    uint32_t max_value = 0;
     for (size_t i = 0; i < constants::MAX_VAL + 1; i++) {
-        if (cnts[i] != 0)
+        if (cnts[i] != 0) {
             uniq_syms++;
+            max_value = i;
+        }
     }
     uint64_t target_M = uniq_syms * constants::FRAME_SIZE_FACTOR;
     uint64_t target_PTWO = target_M;
@@ -320,17 +324,18 @@ bool create_enc_model(std::vector<uint8_t>& enc_models, const counts& cnts)
     auto model_ptr = reinterpret_cast<ans_msb::enc_model*>(new_model.data());
     auto& model = *model_ptr;
     model.M = target_PTWO;
+    model.max_value = max_value;
     std::cout << "M = " << model.M << std::endl;
 
     // (2a) fill the tables
     uint64_t base = 0;
-    for (size_t i = 0; i <= constants::MAX_VAL; i++) {
+    for (size_t i = 0; i <= model.max_value; i++) {
         model.table[i].freq = norm_counts[i];
         model.table[i].base = base;
         base += norm_counts[i];
     }
     const uint64_t tmp = ((constants::NORM_LOWER_BOUND / model.M) * ans_msb::constants::OUTPUT_BASE);
-    for (size_t k = 0; k <= constants::MAX_VAL; k++) {
+    for (size_t k = 0; k <= model.max_value; k++) {
         model.table[k].SUB = tmp * model.table[k].freq;
     }
     enc_models.insert(enc_models.end(), new_model.begin(), new_model.end());
@@ -351,7 +356,7 @@ void create_dec_model(std::vector<uint8_t>& dec_models, const ans_msb::enc_model
 
     // (2) create csum table for decoding
     size_t base = 0;
-    for (size_t j = 0; j <= constants::MAX_VAL; j++) {
+    for (size_t j = 0; j <= enc_model.max_value; j++) {
         auto cur_freq = enc_model.table[j].freq;
         for (size_t k = 0; k < cur_freq; k++) {
             model.table[base + k].mapped_num = undo_mapping(j);
@@ -369,7 +374,7 @@ void create_dec_model_compact(std::vector<uint8_t>& dec_models, const ans_msb::e
 {
     // (0) determine num uniq syms
     uint64_t num_uniq_syms = 0;
-    for (size_t j = 0; j <= constants::MAX_VAL; j++) {
+    for (size_t j = 0; j <= enc_model.max_value; j++) {
         num_uniq_syms += (enc_model.table[j].freq != 0);
     }
 
@@ -389,7 +394,7 @@ void create_dec_model_compact(std::vector<uint8_t>& dec_models, const ans_msb::e
     // (2) create csum table for decoding
     size_t base = 0;
     size_t sym_offset = 0;
-    for (size_t j = 0; j <= constants::MAX_VAL; j++) {
+    for (size_t j = 0; j <= enc_model.max_value; j++) {
         auto cur_freq = enc_model.table[j].freq;
         if (cur_freq) {
             dec_sym_table_ptr[sym_offset].mapped_num = undo_mapping(j);
@@ -440,6 +445,7 @@ const dec_table_entry_small_sym& decode_num_compact(const dec_model_small& model
     if (enc_size && state < ans_msb::constants::NORM_LOWER_BOUND) {
         ans::input_unit<ans::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
     }
+    __builtin_prefetch((const void*)(&table[(state & model.MASK_M)]), 0, 0);
     return sym_entry;
 }
 }

@@ -288,7 +288,8 @@ struct msb_model_medmax_2d_merged {
         static const std::vector<uint32_t> MAG2SEL{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9,
             10, 10, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
         static std::vector<uint32_t> buf(ans::constants::BLOCK_SIZE);
-        std::copy(in, in + n, buf.begin());
+        memcpy(buf.data(), in, n * sizeof(uint32_t));
+        //std::copy(in, in + n, buf.begin());
         std::sort(buf.begin(), buf.begin() + n);
         uint32_t mag_med = ans::magnitude(buf[n / 2] + 1);
         uint32_t mag_max = ans::magnitude(buf[n - 1] + 1);
@@ -571,18 +572,11 @@ struct ans_msb_model {
     decode(uint8_t const* in, uint32_t* out,
         uint32_t sum_of_values, size_t n, uint8_t const* dec_model_u8)
     {
-        // bool is_freq_decode = sum_of_values == uint32_t(-1);
-        // auto& dec_stats = ans_dec_stats::stats(is_freq_decode);
-
         if (sum_of_values == 0) {
             memset(out, 0, sizeof(uint32_t) * n);
-            // dec_stats.num_no_decodes++;
-            // dec_stats.postings_no_decodes += n;
             return in;
         }
         if (sum_of_values != uint32_t(-1) && n <= ans_msb::constants::VBYTE_THRESHOLD) {
-            // dec_stats.num_no_decodes++;
-            // dec_stats.postings_no_decodes += n;
             if (n == 1) {
                 *out = sum_of_values;
                 return in;
@@ -596,16 +590,8 @@ struct ans_msb_model {
         // uniform block
         if (bh.model_id == 0) {
             memset(out, 0, sizeof(uint32_t) * n);
-            // dec_stats.num_no_decodes++;
-            // dec_stats.postings_no_decodes += n;
             return in;
         }
-
-        // dec_stats.num_model_decodes++;
-        // dec_stats.postings_model_decodes += n;
-        // dec_stats.model_usage[bh.model_id]++;
-        // dec_stats.final_state_bytes[bh.final_state_bytes]++;
-
         size_t ans_enc_size = bh.num_ans_u32s * sizeof(uint32_t);
         auto model_ptrs = reinterpret_cast<const uint32_t*>(dec_model_u8);
         size_t model_offset = model_ptrs[bh.model_id];
@@ -622,26 +608,42 @@ struct ans_msb_model {
 #else
         auto cur_model = reinterpret_cast<const ans_msb::dec_model*>(dec_model_u8 + model_offset);
 #endif
-        // dec_stats.model_frame_size[bh.model_id] = cur_model->M;
-        // uint64_t num_renorms = 0;
-        // uint64_t renorm_int = 1;
-        for (size_t k = 0; k < n; k++) {
-// uint64_t prev_renorm = num_renorms;
+        size_t k = 0;
+        for (; k < n; k += 4) {
+#ifdef COMPACT_DEC_TABLE
+            const auto& dec_entry1 = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
+#else
+            const auto& dec_entry1 = decode_num(*cur_model, state, in, ans_enc_size);
+#endif
+#ifdef COMPACT_DEC_TABLE
+            const auto& dec_entry2 = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
+#else
+            const auto& dec_entry2 = decode_num(*cur_model, state, in, ans_enc_size);
+#endif
+#ifdef COMPACT_DEC_TABLE
+            const auto& dec_entry3 = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
+#else
+            const auto& dec_entry3 = decode_num(*cur_model, state, in, ans_enc_size);
+#endif
+#ifdef COMPACT_DEC_TABLE
+            const auto& dec_entry4 = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
+#else
+            const auto& dec_entry4 = decode_num(*cur_model, state, in, ans_enc_size);
+#endif
+            *out++ = ans_msb::undo_mapping(dec_entry1, except_ptr) - 1;
+            *out++ = ans_msb::undo_mapping(dec_entry2, except_ptr) - 1;
+            *out++ = ans_msb::undo_mapping(dec_entry3, except_ptr) - 1;
+            *out++ = ans_msb::undo_mapping(dec_entry4, except_ptr) - 1;
+        }
+
+        for (; k < n; k++) {
 #ifdef COMPACT_DEC_TABLE
             const auto& dec_entry = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
 #else
             const auto& dec_entry = decode_num(*cur_model, state, in, ans_enc_size);
 #endif
-            // if (num_renorms != prev_renorm) {
-            //     dec_stats.min_renorm_interval[bh.model_id] = std::min(renorm_int, dec_stats.min_renorm_interval[bh.model_id]);
-            //     renorm_int = 1;
-            // } else {
-            //     renorm_int++;
-            // }
-            // prev_renorm = num_renorms;
             *out++ = ans_msb::undo_mapping(dec_entry, except_ptr) - 1;
         }
-        // dec_stats.ans_renorms_per_block[bh.model_id] += num_renorms;
         return except_ptr;
     }
 };
