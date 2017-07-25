@@ -608,35 +608,8 @@ struct ans_msb_model {
 #else
         auto cur_model = reinterpret_cast<const ans_msb::dec_model*>(dec_model_u8 + model_offset);
 #endif
-        size_t k = 0;
-        for (; k < n; k += 4) {
-#ifdef COMPACT_DEC_TABLE
-            const auto& dec_entry1 = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
-#else
-            const auto& dec_entry1 = decode_num(*cur_model, state, in, ans_enc_size);
-#endif
-#ifdef COMPACT_DEC_TABLE
-            const auto& dec_entry2 = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
-#else
-            const auto& dec_entry2 = decode_num(*cur_model, state, in, ans_enc_size);
-#endif
-#ifdef COMPACT_DEC_TABLE
-            const auto& dec_entry3 = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
-#else
-            const auto& dec_entry3 = decode_num(*cur_model, state, in, ans_enc_size);
-#endif
-#ifdef COMPACT_DEC_TABLE
-            const auto& dec_entry4 = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
-#else
-            const auto& dec_entry4 = decode_num(*cur_model, state, in, ans_enc_size);
-#endif
-            *out++ = ans_msb::undo_mapping(dec_entry1, except_ptr) - 1;
-            *out++ = ans_msb::undo_mapping(dec_entry2, except_ptr) - 1;
-            *out++ = ans_msb::undo_mapping(dec_entry3, except_ptr) - 1;
-            *out++ = ans_msb::undo_mapping(dec_entry4, except_ptr) - 1;
-        }
 
-        for (; k < n; k++) {
+        for (size_t k = 0; k < n; k++) {
 #ifdef COMPACT_DEC_TABLE
             const auto& dec_entry = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
 #else
