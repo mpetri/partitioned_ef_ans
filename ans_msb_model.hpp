@@ -469,12 +469,13 @@ struct ans_msb_model {
             if (enc_models[i] != 0) {
                 size_t enc_model_offset = enc_models[i];
                 auto enc_model_ptr = reinterpret_cast<const ans_msb::enc_model*>(enc_models_u8.data() + enc_model_offset);
+                const auto& enc_model = *enc_model_ptr;
                 size_t model_size = dec_models_u8.size();
-#ifdef COMPACT_DEC_TABLE
-                ans_msb::create_dec_model_compact(dec_models_u8, *enc_model_ptr);
-#else
-                ans_msb::create_dec_model(dec_models_u8, *enc_model_ptr);
-#endif
+                if (enc_model.M <= ans_msb::constants::FAST_MODEL_THRESHOLD && enc_model.max_value <= 255) {
+                    ans_msb::create_dec_model_fast(dec_models_u8, enc_model);
+                } else {
+                    ans_msb::create_dec_model_compact(dec_models_u8, enc_model);
+                }
                 model_size = dec_models_u8.size() - model_size;
                 auto model_offset_u64_ptr = reinterpret_cast<uint32_t*>(dec_models_u8.data()) + i;
                 *model_offset_u64_ptr = dec_model_offset;
@@ -601,21 +602,21 @@ struct ans_msb_model {
 
         // (1) decode the ans parts and the exceptions at the same time
         auto except_ptr = in + ans_enc_size;
-#ifdef COMPACT_DEC_TABLE
-        auto cur_model = reinterpret_cast<const ans_msb::dec_model_small*>(dec_model_u8 + model_offset);
-        auto cur_sym_table = reinterpret_cast<const ans_msb::dec_table_entry_small*>(cur_model->table_data);
-        auto dec_sym_table_ptr = reinterpret_cast<const ans_msb::dec_table_entry_small_sym*>(cur_model->table_data + cur_model->M * sizeof(ans_msb::dec_table_entry_small));
-#else
-        auto cur_model = reinterpret_cast<const ans_msb::dec_model*>(dec_model_u8 + model_offset);
-#endif
-
-        for (size_t k = 0; k < n; k++) {
-#ifdef COMPACT_DEC_TABLE
-            const auto& dec_entry = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
-#else
-            const auto& dec_entry = decode_num(*cur_model, state, in, ans_enc_size);
-#endif
-            *out++ = ans_msb::undo_mapping(dec_entry, except_ptr) - 1;
+        auto cur_model_ptr = reinterpret_cast<const ans_msb::dec_model_fast*>(dec_model_u8 + model_offset);
+        if (cur_model_ptr->model_type == 0) {
+            const auto& cur_model = *cur_model_ptr;
+            for (size_t k = 0; k < n; k++) {
+                *out++ = decode_num_fast(cur_model, state, in, ans_enc_size) - 1;
+            }
+        } else {
+            auto compact_model_ptr = reinterpret_cast<const ans_msb::dec_model_compact*>(dec_model_u8 + model_offset);
+            const auto& cur_model = *compact_model_ptr;
+            auto cur_sym_table = reinterpret_cast<const ans_msb::dec_table_entry_compact*>(compact_model_ptr->table_data);
+            auto dec_sym_table_ptr = reinterpret_cast<const ans_msb::dec_table_entry_compact_sym*>(compact_model_ptr->table_data + cur_model.M * sizeof(ans_msb::dec_table_entry_compact));
+            for (size_t k = 0; k < n; k++) {
+                const auto& dec_entry = decode_num_compact(cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
+                *out++ = ans_msb::undo_mapping(dec_entry, except_ptr) - 1;
+            }
         }
         return except_ptr;
     }
