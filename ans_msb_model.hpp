@@ -525,10 +525,8 @@ struct ans_msb_model {
         bh.model_id = model_type::pick_model(in, n);
 
         // (2) remap the model id
-        // std::cout << "model_id = " << bh.model_id << " remap to ";
         auto remap_table_ptr = reinterpret_cast<const uint32_t*>(enc_model_u8.data()) + NUM_MODELS;
         bh.model_id = remap_table_ptr[bh.model_id];
-        // std::cout << bh.model_id << std::endl;
 
         if (bh.model_id == 0) { // all 1s. continue
             model_type::write_block_header(bh, out);
@@ -544,29 +542,74 @@ struct ans_msb_model {
         auto out_start = out_ptr;
         auto except_start = except_ptr;
         auto cur_model = reinterpret_cast<const ans_msb::enc_model*>(enc_model_u8.data() + model_offset);
-        for (size_t k = 0; k < n; k++) {
-            uint32_t num = in[n - k - 1] + 1;
-            uint32_t mapped_num = ans_msb::mapping_and_exceptions(num, except_ptr);
-            state = ans_msb::encode_num(*cur_model, state, mapped_num, out_ptr);
+        const auto& enc_model = *cur_model;
+
+        // do we want to decode this fast later on?
+        if (enc_model.M <= ans_msb::constants::FAST_MODEL_THRESHOLD && enc_model.max_value <= 255 && n == 128) {
+            // encode with 2 states. this will have no exceptions!
+            uint64_t state2 = 0;
+            for (size_t k = 0; k < n; k += 2) {
+                uint32_t num1 = in[n - k - 2] + 1;
+                uint32_t num2 = in[n - k - 1] + 1;
+                // std::cout << "state1 encode " << num1 << " state = " << state << std::endl;
+                state = ans_msb::encode_num(enc_model, state, num1, out_ptr);
+                // std::cout << "state2 encode " << num2 << " state = " << state2 << std::endl;
+                state2 = ans_msb::encode_num(enc_model, state2, num2, except_ptr);
+            }
+            size_t enc_size1 = out_start - out_ptr;
+            size_t u32s_written1 = enc_size1 / sizeof(uint32_t);
+            size_t enc_size2 = except_start - except_ptr;
+            size_t u32s_written2 = enc_size2 / sizeof(uint32_t);
+
+            // write regular block header
+            bh.final_state_bytes = ans::state_bytes(state);
+            bh.num_ans_u32s = u32s_written1;
+            model_type::write_block_header(bh, out);
+
+            // flush state1
+            ans::flush_state(state, out_ptr, bh.final_state_bytes);
+
+            // output encoding data1
+            size_t final_ans_size1 = out_start - out_ptr;
+            out.insert(out.end(), out_ptr, out_ptr + final_ans_size1);
+
+            // output header for 2nd encoding
+            uint64_t fsb2 = ans::state_bytes(state2);
+            uint8_t packed = ans_msb::pack_second_state_info(fsb2, u32s_written2);
+            // std::cout << "state2 info = " << fsb2 << " - " << u32s_written2 * sizeof(uint32_t) << std::endl;
+
+            // flush state2
+            ans::flush_state(state2, except_ptr, fsb2);
+            except_ptr--;
+            *except_ptr = packed;
+            size_t final_ans_size2 = except_start - except_ptr;
+            out.insert(out.end(), except_ptr, except_ptr + final_ans_size2);
+
+        } else {
+            for (size_t k = 0; k < n; k++) {
+                uint32_t num = in[n - k - 1] + 1;
+                uint32_t mapped_num = ans_msb::mapping_and_exceptions(num, except_ptr);
+                state = ans_msb::encode_num(*cur_model, state, mapped_num, out_ptr);
+            }
+            size_t enc_size = out_start - out_ptr;
+            size_t u32s_written = enc_size / sizeof(uint32_t);
+
+            // (3) write block header
+
+            bh.final_state_bytes = ans::state_bytes(state);
+            bh.num_ans_u32s = u32s_written;
+            model_type::write_block_header(bh, out);
+
+            // (4) write the final state
+            ans::flush_state(state, out_ptr, bh.final_state_bytes);
+
+            // (5) copy the ans output to the buffer
+            size_t final_ans_size = out_start - out_ptr;
+            out.insert(out.end(), out_ptr, out_ptr + final_ans_size);
+            size_t final_except_size = except_start - except_ptr;
+            if (final_except_size)
+                out.insert(out.end(), except_ptr + 1, except_ptr + final_except_size + 1);
         }
-        size_t enc_size = out_start - out_ptr;
-        size_t u32s_written = enc_size / sizeof(uint32_t);
-
-        // (3) write block header
-
-        bh.final_state_bytes = ans::state_bytes(state);
-        bh.num_ans_u32s = u32s_written;
-        model_type::write_block_header(bh, out);
-
-        // (4) write the final state
-        ans::flush_state(state, out_ptr, bh.final_state_bytes);
-
-        // (5) copy the ans output to the buffer
-        size_t final_ans_size = out_start - out_ptr;
-        out.insert(out.end(), out_ptr, out_ptr + final_ans_size);
-        size_t final_except_size = except_start - except_ptr;
-        if (final_except_size)
-            out.insert(out.end(), except_ptr + 1, except_ptr + final_except_size + 1);
     }
 
     static uint8_t const*
@@ -605,8 +648,27 @@ struct ans_msb_model {
         auto cur_model_ptr = reinterpret_cast<const ans_msb::dec_model_fast*>(dec_model_u8 + model_offset);
         if (cur_model_ptr->model_type == 0) {
             const auto& cur_model = *cur_model_ptr;
-            for (size_t k = 0; k < n; k++) {
-                *out++ = decode_num_fast(cur_model, state, in, ans_enc_size);
+            if (n == 128) {
+                // we want fast decoding so we get the 2nd state
+                auto in2 = except_ptr;
+                uint64_t fsb, ans_enc_size_2;
+                ans_msb::second_state_info(in2, fsb, ans_enc_size_2);
+                // std::cout << "state2 info = " << fsb << " - " << ans_enc_size_2 << std::endl;
+                uint64_t state2 = ans::init_decoder(in2, fsb);
+                for (size_t k = 0; k < n; k += 2) {
+                    out[0] = decode_num_fast(cur_model, state, in, ans_enc_size);
+                    out[1] = decode_num_fast(cur_model, state2, in2, ans_enc_size_2);
+                    // std::cout << "state 1 decode " << out[0] << " state1 = " << state << std::endl;
+                    // std::cout << "state 2 decode " << out[1] << " state2 = " << state2 << std::endl;
+                    out += 2;
+                }
+                // std::cout << "decoding done " << ans_enc_size << " " << ans_enc_size_2 << std::endl;
+                return in2;
+            } else {
+                for (size_t k = 0; k < n; k++) {
+                    *out++ = decode_num_fast(cur_model, state, in, ans_enc_size);
+                }
+                return in;
             }
         } else {
             auto compact_model_ptr = reinterpret_cast<const ans_msb::dec_model_compact*>(dec_model_u8 + model_offset);

@@ -453,4 +453,17 @@ const dec_table_entry_compact_sym& decode_num_compact(const dec_model_compact& m
     }
     return sym_entry;
 }
+
+uint8_t pack_second_state_info(uint64_t fsb, uint64_t ans_enc_size)
+{
+    uint8_t packed = ((fsb - 1) << 5) + ans_enc_size;
+    return packed;
+}
+
+void second_state_info(const uint8_t*& in, uint64_t& fsb, uint64_t& ans_enc_size)
+{
+    uint8_t packed = *in++;
+    fsb = (packed >> 5) + 1;
+    ans_enc_size = (packed & 31) * sizeof(uint32_t);
+}
 }
