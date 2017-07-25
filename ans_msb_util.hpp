@@ -312,8 +312,11 @@ bool create_enc_model(std::vector<uint8_t>& enc_models, const counts& cnts)
     }
     uint64_t target_M = uniq_syms * constants::FRAME_SIZE_FACTOR;
     uint64_t target_PTWO = target_M;
+    std::cout << "uniq_syms = " << uniq_syms << std::endl;
+    std::cout << "target_M = " << target_M << std::endl;
     if (!ans::is_power_of_two(target_PTWO))
         target_PTWO = ans::next_power_of_two(target_PTWO);
+    std::cout << "target_PTWO = " << target_PTWO << std::endl;
 
     // (1) normalize the counts
     auto norm_counts = ans_msb::normalize_freqs(cnts, target_PTWO);

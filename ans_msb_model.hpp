@@ -609,20 +609,11 @@ struct ans_msb_model {
         auto cur_model = reinterpret_cast<const ans_msb::dec_model*>(dec_model_u8 + model_offset);
 #endif
 
-        size_t k = 0;
-        for (; k < n && ans_enc_size; k++) {
+        for (size_t k = 0; k < n; k++) {
 #ifdef COMPACT_DEC_TABLE
             const auto& dec_entry = decode_num_compact(*cur_model, cur_sym_table, dec_sym_table_ptr, state, in, ans_enc_size);
 #else
             const auto& dec_entry = decode_num(*cur_model, state, in, ans_enc_size);
-#endif
-            *out++ = ans_msb::undo_mapping(dec_entry, except_ptr) - 1;
-        }
-        for (; k < n; k++) {
-#ifdef COMPACT_DEC_TABLE
-            const auto& dec_entry = decode_num_compact_no_renorm(*cur_model, cur_sym_table, dec_sym_table_ptr, state);
-#else
-            const auto& dec_entry = decode_num_no_renorm(*cur_model, state);
 #endif
             *out++ = ans_msb::undo_mapping(dec_entry, except_ptr) - 1;
         }
