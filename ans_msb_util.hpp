@@ -435,6 +435,14 @@ const dec_table_entry& decode_num(const dec_model& model, uint64_t& state, const
     return entry;
 }
 
+const dec_table_entry& decode_num_no_renorm(const dec_model& model, uint64_t& state)
+{
+    uint64_t state_mod_M = state & model.MASK_M;
+    const auto& entry = model.table[state_mod_M];
+    state = entry.freq * (state >> model.LOG2_M) + entry.offset;
+    return entry;
+}
+
 const dec_table_entry_small_sym& decode_num_compact(const dec_model_small& model,
     const dec_table_entry_small* table, const dec_table_entry_small_sym* sym_table, uint64_t& state, const uint8_t*& in, size_t& enc_size)
 {
@@ -445,7 +453,16 @@ const dec_table_entry_small_sym& decode_num_compact(const dec_model_small& model
     if (enc_size && state < ans_msb::constants::NORM_LOWER_BOUND) {
         ans::input_unit<ans::constants::OUTPUT_BASE_LOG2>(in, state, enc_size);
     }
-    __builtin_prefetch((const void*)(&table[(state & model.MASK_M)]), 0, 0);
+    return sym_entry;
+}
+
+const dec_table_entry_small_sym& decode_num_compact_no_renorm(const dec_model_small& model,
+    const dec_table_entry_small* table, const dec_table_entry_small_sym* sym_table, uint64_t& state)
+{
+    uint64_t state_mod_M = state & model.MASK_M;
+    const auto& entry = table[state_mod_M];
+    const auto& sym_entry = sym_table[entry.sym_offset];
+    state = sym_entry.freq * (state >> model.LOG2_M) + entry.offset;
     return sym_entry;
 }
 }
