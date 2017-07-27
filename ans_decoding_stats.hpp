@@ -4,6 +4,7 @@
 #include <iostream>
 
 struct ans_dec_stats {
+    uint64_t total_postings_decodes = 0;
     uint64_t num_no_decodes = 0;
     uint64_t postings_no_decodes = 0;
     uint64_t num_model_decodes = 0;
@@ -34,6 +35,7 @@ struct ans_dec_stats {
     {
         std::cout << "DOCUMENT DECODING STATS" << std::endl;
         const auto& s = doc_stats();
+        std::cout << "total_postings_decoded = " << s.total_postings_decodes << std::endl;
         std::cout << "num_no_decodes = " << s.num_no_decodes << std::endl;
         std::cout << "postings_no_decodes = " << s.postings_no_decodes << std::endl;
         std::cout << "num_model_decodes = " << s.num_model_decodes << std::endl;
@@ -62,6 +64,7 @@ struct ans_dec_stats {
     {
         std::cout << "FREQ DECODING STATS" << std::endl;
         const auto& s = freq_stats();
+        std::cout << "total_postings_decoded = " << s.total_postings_decodes << std::endl;
         std::cout << "num_no_decodes = " << s.num_no_decodes << std::endl;
         std::cout << "postings_no_decodes = " << s.postings_no_decodes << std::endl;
         std::cout << "num_model_decodes = " << s.num_model_decodes << std::endl;

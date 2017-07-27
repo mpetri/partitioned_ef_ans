@@ -577,6 +577,7 @@ struct ans_msb_model {
 #ifdef COLLECT_ANS_STATS
         bool is_freq = sum_of_values == uint32_t(-1);
         auto& s = ans_dec_stats::stats(is_freq);
+        s.total_postings_decodes += n;
 #endif
         if (sum_of_values == 0) {
             memset(out, 0, sizeof(uint32_t) * n);
