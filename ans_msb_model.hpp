@@ -12,6 +12,7 @@
 #include "block_codecs.hpp"
 
 #define COMPACT_DEC_TABLE 1
+#define COLLECT_ANS_STATS 1
 
 struct msb_block_header {
     uint32_t model_id = 0;
@@ -573,15 +574,31 @@ struct ans_msb_model {
     decode(uint8_t const* in, uint32_t* out,
         uint32_t sum_of_values, size_t n, uint8_t const* dec_model_u8)
     {
+#ifdef COLLECT_ANS_STATS
+        bool is_freq = sum_of_values == uint32_t(-1);
+        auto& s = ans_dec_stats::stats(is_freq);
+#endif
         if (sum_of_values == 0) {
             memset(out, 0, sizeof(uint32_t) * n);
+#ifdef COLLECT_ANS_STATS
+            s.num_no_decodes++;
+            s.postings_no_decodes += n;
+#endif
             return in;
         }
         if (sum_of_values != uint32_t(-1) && n <= ans_msb::constants::VBYTE_THRESHOLD) {
             if (n == 1) {
                 *out = sum_of_values;
+#ifdef COLLECT_ANS_STATS
+                s.num_no_decodes++;
+                s.postings_no_decodes++;
+#endif
                 return in;
             }
+#ifdef COLLECT_ANS_STATS
+            s.num_no_decodes++;
+            s.postings_no_decodes += n;
+#endif
             return TightVariableByte::decode(in, out, n);
         }
 
@@ -591,8 +608,20 @@ struct ans_msb_model {
         // uniform block
         if (bh.model_id == 0) {
             memset(out, 0, sizeof(uint32_t) * n);
+#ifdef COLLECT_ANS_STATS
+            s.num_no_decodes++;
+            s.postings_no_decodes += n;
+            s.model_usage[0]++;
+#endif
             return in;
         }
+
+#ifdef COLLECT_ANS_STATS
+        s.num_model_decodes++;
+        s.postings_model_decodes += n;
+        s.model_usage[bh.model_id]++;
+#endif
+
         size_t ans_enc_size = bh.num_ans_u32s * sizeof(uint32_t);
         auto model_ptrs = reinterpret_cast<const uint32_t*>(dec_model_u8);
         size_t model_offset = model_ptrs[bh.model_id];
@@ -605,12 +634,18 @@ struct ans_msb_model {
         auto cur_model_ptr = reinterpret_cast<const ans_msb::dec_model_fast*>(dec_model_u8 + model_offset);
         if (cur_model_ptr->model_type == 0) {
             const auto& cur_model = *cur_model_ptr;
+#ifdef COLLECT_ANS_STATS
+            s.model_frame_size[bh.model_id] = cur_model.M;
+#endif
             for (size_t k = 0; k < n; k++) {
                 *out++ = decode_num_fast(cur_model, state, in, ans_enc_size);
             }
         } else {
             auto compact_model_ptr = reinterpret_cast<const ans_msb::dec_model_compact*>(dec_model_u8 + model_offset);
             const auto& cur_model = *compact_model_ptr;
+#ifdef COLLECT_ANS_STATS
+            s.model_frame_size[bh.model_id] = cur_model.M;
+#endif
             auto cur_sym_table = reinterpret_cast<const ans_msb::dec_table_entry_compact*>(compact_model_ptr->table_data);
             auto dec_sym_table_ptr = reinterpret_cast<const ans_msb::dec_table_entry_compact_sym*>(compact_model_ptr->table_data + cur_model.M * sizeof(ans_msb::dec_table_entry_compact));
             for (size_t k = 0; k < n; k++) {

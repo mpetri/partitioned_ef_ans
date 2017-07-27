@@ -10,13 +10,9 @@ struct ans_dec_stats {
     uint64_t postings_model_decodes = 0;
     uint64_t model_usage[256] = { 0 };
     uint64_t model_frame_size[256] = { 0 };
-    uint64_t ans_renorms_per_block[256] = { 0 };
-    uint64_t min_renorm_interval[256];
     uint64_t final_state_bytes[8] = { 0 };
     ans_dec_stats()
     {
-        for (size_t i = 0; i < 256; i++)
-            min_renorm_interval[i] = 255;
     }
     static ans_dec_stats& doc_stats()
     {
@@ -43,17 +39,19 @@ struct ans_dec_stats {
         std::cout << "num_model_decodes = " << s.num_model_decodes << std::endl;
         std::cout << "postings_model_decodes = " << s.postings_model_decodes << std::endl;
         size_t non_zero = 0;
+        double avg_model = 0;
+        double total_model = 0;
         for (size_t i = 0; i < 256; i++) {
             if (s.model_usage[i] != 0) {
                 std::cout << non_zero++ << " model_id = " << i << " M = " << s.model_frame_size[i]
                           << " usage = " << s.model_usage[i]
                           << " percent = " << 100.0 * double(s.model_usage[i]) / double(s.num_model_decodes)
-                          << " renorms = " << s.ans_renorms_per_block[i]
-                          << " avg renorms = " << double(s.ans_renorms_per_block[i]) / double(s.model_usage[i])
-                          << " min renorm interval = " << s.min_renorm_interval[i]
                           << std::endl;
+                avg_model += ((i + 1) * s.model_usage[i]);
+                total_model += s.model_usage[i];
             }
         }
+        std::cout << "average model_id = " << (avg_model / total_model) - 1.0 << std::endl;
         for (size_t i = 0; i < 8; i++) {
             std::cout << "final_state_bytes[" << i << "] = " << s.final_state_bytes[i]
                       << " percent = " << 100.0 * double(s.final_state_bytes[i]) / double(s.num_model_decodes)
@@ -68,17 +66,20 @@ struct ans_dec_stats {
         std::cout << "postings_no_decodes = " << s.postings_no_decodes << std::endl;
         std::cout << "num_model_decodes = " << s.num_model_decodes << std::endl;
         std::cout << "postings_model_decodes = " << s.postings_model_decodes << std::endl;
+        size_t non_zero = 0;
+        double avg_model = 0;
+        double total_model = 0;
         for (size_t i = 0; i < 256; i++) {
             if (s.model_usage[i] != 0) {
-                std::cout << "model_id = " << i << " M = " << s.model_frame_size[i]
+                std::cout << non_zero++ << "model_id = " << i << " M = " << s.model_frame_size[i]
                           << " usage = " << s.model_usage[i]
                           << " percent = " << 100.0 * double(s.model_usage[i]) / double(s.num_model_decodes)
-                          << " renorms = " << s.ans_renorms_per_block[i]
-                          << " avg renorms = " << double(s.ans_renorms_per_block[i]) / double(s.model_usage[i])
-                          << " min renorm interval = " << s.min_renorm_interval[i]
                           << std::endl;
+                avg_model += ((i + 1) * s.model_usage[i]);
+                total_model += s.model_usage[i];
             }
         }
+        std::cout << "average model_id = " << (avg_model / total_model) - 1.0 << std::endl;
         for (size_t i = 0; i < 8; i++) {
             std::cout << "final_state_bytes[" << i << "] = " << s.final_state_bytes[i]
                       << " percent = " << 100.0 * double(s.final_state_bytes[i]) / double(s.num_model_decodes)
