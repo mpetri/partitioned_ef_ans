@@ -1,13 +1,16 @@
+ANS inverted index compression
+----------------------------------
+
 ANS inverted index compression based on the inverted index framework from https://github.com/ot/partitioned_elias_fano 
 
-======================
+
+Collection parsing
+----------------------------------
 
 Parsing WARC colllections was done with this script: https://github.com/mpetri/TikaLuceneWarc
 
 
-======================
-
-The next sections are unmodified from the https://github.com/ot/partitioned_elias_fano repo:
+The next sections are almost unmodified from the https://github.com/ot/partitioned_elias_fano repo:
 
 Building the code
 -----------------
