@@ -1,14 +1,13 @@
-partitioned_elias_fano
+ANS inverted index compression based on the inverted index framework from https://github.com/ot/partitioned_elias_fano 
+
 ======================
 
-NOTE: This repository is maintained only for historical reasons. This code is
-now part of [ds2i](https://github.com/ot/ds2i).
+Parsing WARC colllections was done with this script: https://github.com/mpetri/TikaLuceneWarc
 
-This repository contains the code used for the experiments in the paper
 
-* Giuseppe Ottaviano and Rossano Venturini, _Partitioned Elias-Fano Indexes_,
-  ACM SIGIR 2014.
+======================
 
+The next sections are unmodified from the https://github.com/ot/partitioned_elias_fano repo:
 
 Building the code
 -----------------
@@ -67,6 +66,13 @@ again in `test/test_data`.
     $ ./queries opt test_collection.index.opt test_collection.wand < test/test_data/queries
 
 
+Create ANS based indexes
+--------------------------
+
+```
+./create_freq_index block_ansmsbmedmaxmerged test/test_data/test_collection test_collection.index.anspacked2 --check
+```
+
 Collection input format
 -----------------------
 
@@ -94,6 +100,12 @@ A _collection_ consists of 3 files, `<basename>.docs`, `<basename>.freqs`,
 
 Authors
 -------
+
+* Matthias Petri <Matthias.Petri@gmail.com>
+* Alistair Moffat <ammoffat@unimelb.edu.au>
+
+
+Partioned elias fano framework developed by
 
 * Giuseppe Ottaviano <giuott@gmail.com>
 * Rossano Venturini <rossano@di.unipi.it>
