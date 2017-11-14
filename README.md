@@ -108,7 +108,7 @@ Authors
 * Alistair Moffat <ammoffat@unimelb.edu.au>
 
 
-Partioned elias fano framework developed by
+Partitioned Elias-Fano framework developed by
 
 * Giuseppe Ottaviano <giuott@gmail.com>
 * Rossano Venturini <rossano@di.unipi.it>
