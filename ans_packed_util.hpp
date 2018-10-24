@@ -15,7 +15,7 @@
 namespace ans_packed {
 
 namespace constants {
-    const uint32_t BLOCK_SIZE = 128;
+    const uint32_t BLOCK_SIZE = ans::constants::BLOCK_SIZE;
     const uint8_t MAX_MAG = 32;
     const uint8_t NUM_MODELS = 16;
     const std::array<uint8_t, NUM_MODELS> SEL2MAG{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12,

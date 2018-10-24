@@ -5,7 +5,7 @@
 namespace ans {
 
 namespace constants {
-    const uint32_t BLOCK_SIZE = 128;
+    const uint32_t BLOCK_SIZE = 256;
     const uint8_t OUTPUT_BASE_LOG2 = 32;
     const uint64_t OUTPUT_BASE = 1ULL << OUTPUT_BASE_LOG2;
 }
